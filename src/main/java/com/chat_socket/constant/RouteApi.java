@@ -4,4 +4,5 @@ public interface RouteApi {
     String API_V1 = "/v1";
     String AUTH_API = API_V1 + "/auth";
     String USER_API = API_V1 + "/user";
+    String FRIEND_API = API_V1 + "/friend";
 }

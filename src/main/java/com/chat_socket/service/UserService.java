@@ -1,8 +1,8 @@
 package com.chat_socket.service;
 
 import com.chat_socket.dto.BaseResponse;
-import com.chat_socket.dto.UserDto;
+import com.chat_socket.dto.UserProfileDto;
 
 public interface UserService {
-    BaseResponse<UserDto> getUserProfile();
+    BaseResponse<UserProfileDto> getUserProfile();
 }

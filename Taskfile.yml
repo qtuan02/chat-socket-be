@@ -46,3 +46,10 @@ tasks:
     cmds:
       - "{{.MVNW}} spring-boot:run"
 
+  flyway_repair:
+    cmds:
+      - "{{.MVNW}} flyway:repair -Dflyway.url=jdbc:postgresql://localhost:5432/chat-socket-db -Dflyway.user=admin -Dflyway.password=123456"
+
+  compile_without_test:
+    cmds:
+      - "{{.MVNW}} -q -DskipTests clean compile"

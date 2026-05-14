@@ -5,8 +5,8 @@ import com.chat_socket.dto.AuthResponse;
 import com.chat_socket.dto.BaseResponse;
 import com.chat_socket.dto.SignInRequest;
 import com.chat_socket.dto.SignUpRequest;
-import com.chat_socket.entity.Session;
-import com.chat_socket.entity.User;
+import com.chat_socket.entity.SessionEntity;
+import com.chat_socket.entity.UserEntity;
 import com.chat_socket.exception.ForbiddenException;
 import com.chat_socket.exception.SignInException;
 import com.chat_socket.exception.UnAuthorizedException;
@@ -59,7 +59,7 @@ public class AuthServiceImpl implements AuthService {
         if (userRepository.existsByUsername(request.username()))
             return new BaseResponse<>(null, "User already exists", HttpStatus.CONFLICT.value());
 
-        User newUser = userMapper.toEntity(request);
+        UserEntity newUser = userMapper.toEntity(request);
         newUser.setHashedPassword(passwordEncoder.encode(request.password()));
         userRepository.save(newUser);
 
@@ -68,17 +68,17 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public BaseResponse<AuthResponse> signIn(SignInRequest request, HttpServletResponse response) {
-        User user = userRepository
+        UserEntity user = userRepository
                 .findByUsername(request.username())
-                .orElseThrow(() -> new SignInException("Username or passwork incorrect!"));
+                .orElseThrow(() -> new SignInException("Username or password incorrect!"));
 
         if (!passwordEncoder.matches(request.password(), user.getHashedPassword()))
-            throw new SignInException("Username or passwork incorrect!");
+            throw new SignInException("Username or password incorrect!");
 
         String accessToken = jwtService.generateToken(user.getId());
         String refreshToken = jwtService.generateRefreshToken();
         Instant refreshTokenExpiresAt = Instant.now().plus(Duration.ofDays(config.refreshTokenTtl()));
-        sessionRepository.save(new Session(user.getId(), refreshToken, refreshTokenExpiresAt));
+        sessionRepository.save(new SessionEntity(user.getId(), refreshToken, refreshTokenExpiresAt));
 
         addRefreshTokenCookie(response, refreshToken);
 
@@ -88,8 +88,9 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public BaseResponse<String> signOut(HttpServletRequest request, HttpServletResponse response) {
-        String refreshToken = getCookieValue(request, REFRESH_TOKEN_COOKIE_NAME).get();
-        if (refreshToken != null) sessionRepository.deleteByRefreshToken(refreshToken);
+        String refreshToken = getCookieValue(request, REFRESH_TOKEN_COOKIE_NAME)
+                .orElseThrow(() -> new UnAuthorizedException("Token not found."));
+        sessionRepository.deleteByRefreshToken(refreshToken);
         clearRefreshTokenCookie(response);
 
         return new BaseResponse<>(null, "Logout successful.", HttpStatus.OK.value());
@@ -97,10 +98,10 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public BaseResponse<AuthResponse> refresh(HttpServletRequest request, HttpServletResponse response) {
-        String refreshToken = getCookieValue(request, REFRESH_TOKEN_COOKIE_NAME).get();
-        if (refreshToken == null) throw new UnAuthorizedException("Token not found.");
+        String refreshToken = getCookieValue(request, REFRESH_TOKEN_COOKIE_NAME)
+                .orElseThrow(() -> new UnAuthorizedException("Token not found."));
 
-        Session session = sessionRepository
+        SessionEntity session = sessionRepository
                 .findByRefreshToken(refreshToken)
                 .orElseThrow(() -> new ForbiddenException("Token expired or invalid."));
 
