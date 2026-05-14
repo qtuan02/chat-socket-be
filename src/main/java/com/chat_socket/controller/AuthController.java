@@ -9,6 +9,7 @@ import com.chat_socket.service.AuthService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -24,18 +25,28 @@ public class AuthController {
     }
 
     @PostMapping("/sign-up")
-    public BaseResponse<String> signUp(@Valid @RequestBody SignUpRequest requestEntity) {
-        return authService.signUp(requestEntity);
+    public ResponseEntity<BaseResponse<String>> signUp(@Valid @RequestBody SignUpRequest requestEntity) {
+        BaseResponse<String> body = authService.signUp(requestEntity);
+        return ResponseEntity.status(body.status()).body(body);
     }
 
     @PostMapping("/sign-in")
-    public BaseResponse<AuthResponse> signIn(
+    public ResponseEntity<BaseResponse<AuthResponse>> signIn(
             @Valid @RequestBody SignInRequest requestEntity, HttpServletResponse response) {
-        return authService.signIn(requestEntity, response);
+        BaseResponse<AuthResponse> body = authService.signIn(requestEntity, response);
+        return ResponseEntity.status(body.status()).body(body);
     }
 
     @PostMapping("/sign-out")
-    public BaseResponse<String> signOut(HttpServletRequest request, HttpServletResponse response) {
-        return authService.signOut(request, response);
+    public ResponseEntity<BaseResponse<String>> signOut(HttpServletRequest request, HttpServletResponse response) {
+        BaseResponse<String> body = authService.signOut(request, response);
+        return ResponseEntity.status(body.status()).body(body);
+    }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<BaseResponse<AuthResponse>> refresh(
+            HttpServletRequest request, HttpServletResponse response) {
+        BaseResponse<AuthResponse> body = authService.refresh(request, response);
+        return ResponseEntity.status(body.status()).body(body);
     }
 }

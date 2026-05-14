@@ -1,7 +1,6 @@
 package com.chat_socket.service.impl;
 
 import com.chat_socket.ApplicationYaml;
-import com.chat_socket.entity.User;
 import com.chat_socket.service.JwtService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -27,12 +26,11 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    public String generateToken(User user) {
+    public String generateToken(UUID userId) {
         Instant now = Instant.now();
 
         return Jwts.builder()
-                .subject(user.getId().toString())
-                .claim("username", user.getUsername())
+                .subject(userId.toString())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(Duration.ofMinutes(accessTokenTtl))))
                 .signWith(accessTokenKey, Jwts.SIG.HS256)

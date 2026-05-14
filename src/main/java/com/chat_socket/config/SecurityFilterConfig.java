@@ -54,21 +54,21 @@ public class SecurityFilterConfig extends OncePerRequestFilter {
         // Get token from header
         String authorizationHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
-            writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Access token not found.");
+            writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Token not found.");
             return;
         }
         String accessToken =
                 authorizationHeader.substring(BEARER_PREFIX.length()).trim();
         if (accessToken.isBlank()) {
-            writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Access token not found.");
+            writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Token not found.");
             return;
         }
 
-        // Verify access token and get user id
+        // Verify Token and get user id
         UUID userId = getUserIdFromAccessToken(accessToken);
         if (userId == null) {
             SecurityContextHolder.clearContext();
-            writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Access token expired or invalid.");
+            writeErrorResponse(response, HttpStatus.FORBIDDEN, "Token expired or invalid.");
             return;
         }
 

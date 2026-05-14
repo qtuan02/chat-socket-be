@@ -13,4 +13,6 @@ public interface AuthService {
     BaseResponse<AuthResponse> signIn(SignInRequest request, HttpServletResponse response);
 
     BaseResponse<String> signOut(HttpServletRequest request, HttpServletResponse response);
+
+    BaseResponse<AuthResponse> refresh(HttpServletRequest request, HttpServletResponse response);
 }

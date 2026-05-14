@@ -7,7 +7,9 @@ import com.chat_socket.dto.SignInRequest;
 import com.chat_socket.dto.SignUpRequest;
 import com.chat_socket.entity.Session;
 import com.chat_socket.entity.User;
+import com.chat_socket.exception.ForbiddenException;
 import com.chat_socket.exception.SignInException;
+import com.chat_socket.exception.UnAuthorizedException;
 import com.chat_socket.mapper.UserMapper;
 import com.chat_socket.repository.SessionRepository;
 import com.chat_socket.repository.UserRepository;
@@ -73,7 +75,7 @@ public class AuthServiceImpl implements AuthService {
         if (!passwordEncoder.matches(request.password(), user.getHashedPassword()))
             throw new SignInException("Username or passwork incorrect!");
 
-        String accessToken = jwtService.generateToken(user);
+        String accessToken = jwtService.generateToken(user.getId());
         String refreshToken = jwtService.generateRefreshToken();
         Instant refreshTokenExpiresAt = Instant.now().plus(Duration.ofDays(config.refreshTokenTtl()));
         sessionRepository.save(new Session(user.getId(), refreshToken, refreshTokenExpiresAt));
@@ -91,6 +93,27 @@ public class AuthServiceImpl implements AuthService {
         clearRefreshTokenCookie(response);
 
         return new BaseResponse<>(null, "Logout successful.", HttpStatus.OK.value());
+    }
+
+    @Override
+    public BaseResponse<AuthResponse> refresh(HttpServletRequest request, HttpServletResponse response) {
+        String refreshToken = getCookieValue(request, REFRESH_TOKEN_COOKIE_NAME).get();
+        if (refreshToken == null) throw new UnAuthorizedException("Token not found.");
+
+        Session session = sessionRepository
+                .findByRefreshToken(refreshToken)
+                .orElseThrow(() -> new ForbiddenException("Token expired or invalid."));
+
+        if (session.getExpiresAt().isBefore(Instant.now())) {
+            sessionRepository.deleteByRefreshToken(refreshToken);
+            clearRefreshTokenCookie(response);
+            throw new ForbiddenException("Token expired or invalid.");
+        }
+
+        String accessToken = jwtService.generateToken(session.getUserId());
+
+        return new BaseResponse<>(
+                new AuthResponse(accessToken), "Token refreshed successfully.", HttpStatus.OK.value());
     }
 
     private void addRefreshTokenCookie(HttpServletResponse response, String refreshToken) {

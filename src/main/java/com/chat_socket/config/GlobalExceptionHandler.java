@@ -1,8 +1,10 @@
 package com.chat_socket.config;
 
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.exception.ForbiddenException;
 import com.chat_socket.exception.NotFoundException;
 import com.chat_socket.exception.SignInException;
+import com.chat_socket.exception.UnAuthorizedException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springframework.http.HttpHeaders;
@@ -47,5 +49,17 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
     ResponseEntity<Object> handleNotFoundException(NotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new BaseResponse<>(null, ex.getMessage(), HttpStatus.NOT_FOUND.value()));
+    }
+
+    @ExceptionHandler(UnAuthorizedException.class)
+    ResponseEntity<Object> handleUnAuthorizedException(UnAuthorizedException ex) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new BaseResponse<>(null, ex.getMessage(), HttpStatus.UNAUTHORIZED.value()));
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    ResponseEntity<Object> handleForbiddenException(ForbiddenException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(new BaseResponse<>(null, ex.getMessage(), HttpStatus.FORBIDDEN.value()));
     }
 }
