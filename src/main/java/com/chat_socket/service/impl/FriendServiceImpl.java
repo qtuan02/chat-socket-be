@@ -21,7 +21,8 @@ import com.chat_socket.repository.FriendRepository;
 import com.chat_socket.repository.FriendRequestRepository;
 import com.chat_socket.repository.UserRepository;
 import com.chat_socket.service.FriendService;
-import com.chat_socket.utils.SecurityContext;
+import com.chat_socket.utils.Normalize;
+import com.chat_socket.utils.Security;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
@@ -52,7 +53,7 @@ public class FriendServiceImpl implements FriendService {
 
     @Override
     public BaseResponse<List<UserDto>> getListFriend() {
-        UserSecurity currentUser = SecurityContext.getCurrentUser();
+        UserSecurity currentUser = Security.getCurrentUser();
         UUID userId = currentUser.id();
         List<FriendEntity> friendships = friendRepository.findFriendshipsOfUser(userId);
 
@@ -67,7 +68,7 @@ public class FriendServiceImpl implements FriendService {
 
     @Override
     public BaseResponse<FriendRequestResponse> getListFriendRequest() {
-        UserSecurity currentUser = SecurityContext.getCurrentUser();
+        UserSecurity currentUser = Security.getCurrentUser();
         UUID userId = currentUser.id();
         List<FriendRequestEntity> sentRequests =
                 friendRequestRepository.findFriendRequestsSentOfUser(userId, FriendRequestStatus.PENDING);
@@ -108,7 +109,7 @@ public class FriendServiceImpl implements FriendService {
     @Override
     @Transactional
     public BaseResponse<String> sendFriendRequest(FriendSendRequest request) {
-        UserSecurity currentUser = SecurityContext.getCurrentUser();
+        UserSecurity currentUser = Security.getCurrentUser();
         UUID fromUserId = currentUser.id();
         UUID toUserId = request.toUserId();
 
@@ -121,7 +122,7 @@ public class FriendServiceImpl implements FriendService {
         UserEntity toUser =
                 userRepository.findById(toUserId).orElseThrow(() -> new NotFoundException("User not found."));
 
-        UserPair pair = normalizeUserPair(fromUserId, toUserId);
+        UserPair pair = Normalize.normalizeUserPair(fromUserId, toUserId);
         if (friendRepository.existsByUserAIdAndUserBId(pair.userAId(), pair.userBId()))
             return new BaseResponse<>(null, "You are already friends.", HttpStatus.CONFLICT.value());
 
@@ -142,7 +143,7 @@ public class FriendServiceImpl implements FriendService {
     @Override
     @Transactional
     public BaseResponse<AcceptFriendResponse> acceptFriendRequest(FriendActionRequest request) {
-        UserSecurity currentUser = SecurityContext.getCurrentUser();
+        UserSecurity currentUser = Security.getCurrentUser();
         UUID currentUserId = currentUser.id();
         UUID requestId = request.requestId();
 
@@ -176,7 +177,7 @@ public class FriendServiceImpl implements FriendService {
     @Override
     @Transactional
     public BaseResponse<String> declineFriendRequest(FriendActionRequest request) {
-        UserSecurity currentUser = SecurityContext.getCurrentUser();
+        UserSecurity currentUser = Security.getCurrentUser();
         UUID currentUserId = currentUser.id();
         UUID requestId = request.requestId();
 
@@ -193,12 +194,5 @@ public class FriendServiceImpl implements FriendService {
         friendRequestRepository.save(friendRequest);
 
         return new BaseResponse<>(null, null, HttpStatus.NO_CONTENT.value());
-    }
-
-    private UserPair normalizeUserPair(UUID firstUserId, UUID secondUserId) {
-        if (firstUserId.toString().compareTo(secondUserId.toString()) <= 0)
-            return new UserPair(firstUserId, secondUserId);
-
-        return new UserPair(secondUserId, firstUserId);
     }
 }

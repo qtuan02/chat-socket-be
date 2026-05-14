@@ -7,7 +7,7 @@ import com.chat_socket.exception.NotFoundException;
 import com.chat_socket.mapper.UserMapper;
 import com.chat_socket.repository.UserRepository;
 import com.chat_socket.service.UserService;
-import com.chat_socket.utils.SecurityContext;
+import com.chat_socket.utils.Security;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +23,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public BaseResponse<UserProfileDto> getUserProfile() {
-        UserSecurity currentUser = SecurityContext.getCurrentUser();
+        UserSecurity currentUser = Security.getCurrentUser();
         UserProfileDto userProfile = userRepository
                 .findById(currentUser.id())
                 .map(userMapper::toUserProfileDto)

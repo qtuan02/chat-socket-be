@@ -1,4 +1,4 @@
-package com.chat_socket.config;
+package com.chat_socket.security;
 
 import com.chat_socket.constant.RouteApi;
 import com.chat_socket.dto.BaseResponse;
@@ -26,14 +26,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
-public class SecurityFilterConfig extends OncePerRequestFilter {
+public class SecurityFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final ObjectMapper objectMapper;
     private final JwtService jwtService;
     private final UserRepository userRepository;
 
-    public SecurityFilterConfig(ObjectMapper objectMapper, JwtService jwtService, UserRepository userRepository) {
+    public SecurityFilter(ObjectMapper objectMapper, JwtService jwtService, UserRepository userRepository) {
         this.objectMapper = objectMapper;
         this.jwtService = jwtService;
         this.userRepository = userRepository;

@@ -17,6 +17,6 @@ server:
   port: 8089
 
 chat-socket:
-  access-token-secret: b36f4b7a666a2333a289666f390d0cc78b574ab7597faabd8d7722c1dfd2ca01b6c3466b779b921ab8c0e1bb86f5c72ac601c2395dfd9872cccda8046610f68a
+  access-token-secret: secret-key
   access-token-ttl: 15 # minutes
   refresh-token-ttl: 14 # days
