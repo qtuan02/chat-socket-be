@@ -4,6 +4,7 @@ import com.chat_socket.constant.RouteApi;
 import com.chat_socket.dto.BaseResponse;
 import com.chat_socket.dto.UserDto;
 import com.chat_socket.service.UserService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -18,7 +19,8 @@ public class UserController {
     }
 
     @GetMapping("/me")
-    public BaseResponse<UserDto> getMe() {
-        return userService.getUserProfile();
+    public ResponseEntity<BaseResponse<UserDto>> getMe() {
+        BaseResponse<UserDto> body = userService.getUserProfile();
+        return ResponseEntity.status(body.status()).body(body);
     }
 }
