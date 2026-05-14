@@ -1,9 +1,11 @@
 package com.chat_socket.config;
 
+import com.chat_socket.security.SecurityFilter;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -17,6 +19,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityServerConfig {
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -24,7 +27,7 @@ public class SecurityServerConfig {
     }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityFilterConfig securityFilterConfig) {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http, SecurityFilter securityFilter) {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -34,7 +37,7 @@ public class SecurityServerConfig {
                         .permitAll()
                         .anyRequest()
                         .authenticated())
-                .addFilterBefore(securityFilterConfig, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
