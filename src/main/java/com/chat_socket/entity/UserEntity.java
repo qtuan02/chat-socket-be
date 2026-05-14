@@ -21,7 +21,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = TableName.USER_TABLE)
-public class User {
+public class UserEntity {
     @Id
     @UUIDv7
     @Column(name = "id", nullable = false, updatable = false)

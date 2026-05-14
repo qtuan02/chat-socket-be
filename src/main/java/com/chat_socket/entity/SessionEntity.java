@@ -18,7 +18,7 @@ import lombok.Setter;
 @NoArgsConstructor
 @AllArgsConstructor
 @Table(name = TableName.SESSION_TABLE)
-public class Session {
+public class SessionEntity {
     @Id
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;

@@ -1,7 +1,7 @@
 package com.chat_socket.service.impl;
 
 import com.chat_socket.dto.BaseResponse;
-import com.chat_socket.dto.UserDto;
+import com.chat_socket.dto.UserProfileDto;
 import com.chat_socket.dto.UserSecurity;
 import com.chat_socket.exception.NotFoundException;
 import com.chat_socket.mapper.UserMapper;
@@ -22,11 +22,11 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
-    public BaseResponse<UserDto> getUserProfile() {
+    public BaseResponse<UserProfileDto> getUserProfile() {
         UserSecurity currentUser = SecurityContext.getCurrentUser();
-        UserDto userProfile = userRepository
+        UserProfileDto userProfile = userRepository
                 .findById(currentUser.id())
-                .map(userMapper::toDto)
+                .map(userMapper::toUserProfileDto)
                 .orElseThrow(() -> new NotFoundException("User not found"));
 
         return new BaseResponse<>(userProfile, null, HttpStatus.OK.value());

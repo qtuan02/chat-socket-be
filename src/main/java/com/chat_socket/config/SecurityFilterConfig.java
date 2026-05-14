@@ -3,7 +3,7 @@ package com.chat_socket.config;
 import com.chat_socket.constant.RouteApi;
 import com.chat_socket.dto.BaseResponse;
 import com.chat_socket.dto.UserSecurity;
-import com.chat_socket.entity.User;
+import com.chat_socket.entity.UserEntity;
 import com.chat_socket.repository.UserRepository;
 import com.chat_socket.service.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -73,7 +73,7 @@ public class SecurityFilterConfig extends OncePerRequestFilter {
         }
 
         // Find user in database
-        User user = userRepository.findById(userId).orElse(null);
+        UserEntity user = userRepository.findById(userId).orElse(null);
         if (user == null) {
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, HttpStatus.NOT_FOUND, "User does not exist.");
@@ -104,7 +104,7 @@ public class SecurityFilterConfig extends OncePerRequestFilter {
         }
     }
 
-    private void setUserToSecurityContext(User user) {
+    private void setUserToSecurityContext(UserEntity user) {
         UserSecurity userSecurity = new UserSecurity(
                 user.getId(),
                 user.getUsername(),

@@ -3,9 +3,9 @@ CREATE TABLE IF NOT EXISTS messages (
     conversation_id UUID NOT NULL,
     sender_id UUID NOT NULL,
     content TEXT,
-    type VARCHAR(20) DEFAULT 'TEXT', -- Enum: 'TEXT', 'IMAGE', 'FILE', 'SYSTEM'
+    type VARCHAR(20) NOT NULL DEFAULT 'TEXT', -- Enum: 'TEXT', 'IMAGE', 'FILE', 'SYSTEM'
     attachment_url VARCHAR(500),
-    is_deleted BOOLEAN DEFAULT false,
+    is_deleted BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
@@ -13,4 +13,9 @@ CREATE TABLE IF NOT EXISTS messages (
     CONSTRAINT fk_messages_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_messages_conversation_id_created_at ON messages(conversation_id, created_at DESC);
+CREATE INDEX idx_messages_conversation_created_id
+    ON messages(conversation_id, created_at DESC, id DESC);
+
+ALTER TABLE conversations
+    ADD CONSTRAINT fk_conversations_last_message
+    FOREIGN KEY (last_message_id) REFERENCES messages(id) ON DELETE SET NULL;
