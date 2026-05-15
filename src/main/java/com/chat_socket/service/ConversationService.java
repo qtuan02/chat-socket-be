@@ -6,11 +6,12 @@ import com.chat_socket.dto.ConversationRequest;
 import com.chat_socket.dto.MessageDto;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
-import java.util.List;
+import com.chat_socket.enums.ConversationType;
 import java.util.UUID;
 
 public interface ConversationService {
-    BaseResponse<List<ConversationDto>> getConversations();
+    BaseResponse<PaginationResponse<ConversationDto>> getConversations(
+            PaginationRequest request, ConversationType type);
 
     BaseResponse<ConversationDto> createConversation(ConversationRequest request);
 
