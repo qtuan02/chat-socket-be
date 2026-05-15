@@ -2,19 +2,17 @@ package com.chat_socket.security;
 
 import com.chat_socket.constant.RouteApi;
 import com.chat_socket.dto.BaseResponse;
-import com.chat_socket.dto.UserSecurity;
 import com.chat_socket.entity.UserEntity;
 import com.chat_socket.repository.UserRepository;
 import com.chat_socket.service.JwtService;
+import com.chat_socket.utils.Security;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.util.Collections;
 import java.util.UUID;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -57,14 +55,15 @@ public class SecurityFilter extends OncePerRequestFilter {
             writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Token not found.");
             return;
         }
-        String accessToken = authorizationHeader.substring(BEARER_PREFIX.length()).trim();
+        String accessToken =
+                authorizationHeader.substring(BEARER_PREFIX.length()).trim();
         if (accessToken.isBlank()) {
             writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Token not found.");
             return;
         }
 
         // Verify Token and get user id
-        UUID userId = getUserIdFromAccessToken(accessToken);
+        UUID userId = Security.getUserIdFromAccessToken(jwtService, accessToken);
         if (userId == null) {
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, HttpStatus.FORBIDDEN, "Token expired or invalid.");
@@ -80,7 +79,8 @@ public class SecurityFilter extends OncePerRequestFilter {
         }
 
         // Set user to security context
-        setUserToSecurityContext(user);
+        UsernamePasswordAuthenticationToken authentication = Security.getUserAuthentication(user);
+        SecurityContextHolder.getContext().setAuthentication(authentication);
 
         filterChain.doFilter(request, response);
     }
@@ -93,26 +93,5 @@ public class SecurityFilter extends OncePerRequestFilter {
 
         BaseResponse<Object> baseResponse = new BaseResponse<>(null, message, status.value());
         objectMapper.writeValue(response.getWriter(), baseResponse);
-    }
-
-    private UUID getUserIdFromAccessToken(String accessToken) {
-        try {
-            return jwtService.verifyAccessToken(accessToken);
-        } catch (JwtException | IllegalArgumentException exception) {
-            return null;
-        }
-    }
-
-    private void setUserToSecurityContext(UserEntity user) {
-        UserSecurity userSecurity = new UserSecurity(
-                user.getId(),
-                user.getUsername(),
-                user.getFirstName(),
-                user.getLastName(),
-                user.getEmail(),
-                user.getAvatarUrl());
-        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userSecurity, null,
-                Collections.emptyList());
-        SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }
