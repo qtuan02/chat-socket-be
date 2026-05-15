@@ -44,8 +44,8 @@ public class SecurityFilter extends OncePerRequestFilter {
         String requestUri = request.getRequestURI();
 
         return HttpMethod.OPTIONS.matches(request.getMethod())
-                || requestUri.startsWith("/api" + RouteApi.AUTH_API)
-                || requestUri.startsWith(RouteApi.AUTH_API);
+                || requestUri.matches("/api/ws")
+                || requestUri.startsWith("/api" + RouteApi.AUTH_API);
     }
 
     @Override
@@ -57,8 +57,7 @@ public class SecurityFilter extends OncePerRequestFilter {
             writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Token not found.");
             return;
         }
-        String accessToken =
-                authorizationHeader.substring(BEARER_PREFIX.length()).trim();
+        String accessToken = authorizationHeader.substring(BEARER_PREFIX.length()).trim();
         if (accessToken.isBlank()) {
             writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Token not found.");
             return;
@@ -112,8 +111,8 @@ public class SecurityFilter extends OncePerRequestFilter {
                 user.getLastName(),
                 user.getEmail(),
                 user.getAvatarUrl());
-        UsernamePasswordAuthenticationToken authentication =
-                new UsernamePasswordAuthenticationToken(userSecurity, null, Collections.emptyList());
+        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(userSecurity, null,
+                Collections.emptyList());
         SecurityContextHolder.getContext().setAuthentication(authentication);
     }
 }

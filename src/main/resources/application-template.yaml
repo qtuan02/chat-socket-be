@@ -20,3 +20,4 @@ chat-socket:
   access-token-secret: secret-key
   access-token-ttl: 15 # minutes
   refresh-token-ttl: 14 # days
+  client-url: http://localhost:3000

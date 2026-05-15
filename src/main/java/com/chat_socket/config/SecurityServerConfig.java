@@ -31,7 +31,7 @@ public class SecurityServerConfig {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/v1/auth/**")
+                .authorizeHttpRequests(auth -> auth.requestMatchers("/v1/auth/**", "/ws*")
                         .permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**")
                         .permitAll()
