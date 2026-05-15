@@ -28,7 +28,6 @@ import com.chat_socket.utils.Normalize;
 import com.chat_socket.utils.PaginationUtils;
 import com.chat_socket.utils.Security;
 import java.time.LocalDateTime;
-import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,16 +35,12 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ConversationServiceImpl implements ConversationService {
-    private static final int DEFAULT_MESSAGE_LIMIT = 50;
-    private static final int MAX_MESSAGE_LIMIT = 100;
-
     private final ConversationRepository conversationRepository;
     private final MessageRepository messageRepository;
     private final ParticipantRepository participantRepository;
@@ -66,25 +61,42 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
-    public BaseResponse<List<ConversationDto>> getConversations() {
+    public BaseResponse<PaginationResponse<ConversationDto>> getConversations(
+            PaginationRequest request, ConversationType type) {
         UserSecurity currentUser = Security.getCurrentUser();
-        List<ConversationEntity> conversations =
-                conversationRepository.findActiveConversationsForUser(currentUser.id());
 
-        if (conversations.isEmpty())
-            return new BaseResponse<>(List.of(), "Conversations retrieved successfully.", HttpStatus.OK.value());
+        PaginationUtils.CursorPage page = PaginationUtils.resolveCursorPage(request);
 
-        List<UUID> conversationIds =
-                conversations.stream().map(ConversationEntity::getId).toList();
+        List<UUID> fetchedConversationIds = page.cursor() == null
+                ? conversationRepository.findActiveConversationIdsForUser(currentUser.id(), type, page.pageRequest())
+                : conversationRepository.findActiveConversationIdsForUserBeforeCursor(
+                        currentUser.id(), type, page.cursor(), page.pageRequest());
+
+        if (fetchedConversationIds.isEmpty())
+            return new BaseResponse<>(
+                    new PaginationResponse<>(List.of(), null),
+                    "Conversations retrieved successfully.",
+                    HttpStatus.OK.value());
+
+        List<UUID> conversationIds = page.items(fetchedConversationIds);
+        Map<UUID, ConversationEntity> conversationsById =
+                conversationRepository.findConversationsWithDetails(conversationIds).stream()
+                        .collect(Collectors.toMap(ConversationEntity::getId, Function.identity()));
         Map<UUID, Long> unreadCounts =
                 messageRepository.countUnreadMessagesByConversation(currentUser.id(), conversationIds).stream()
                         .collect(Collectors.toMap(
                                 MessageRepository.UnreadCountProjection::getConversationId,
                                 MessageRepository.UnreadCountProjection::getUnreadCount));
 
-        List<ConversationDto> body = conversations.stream()
-                .map(conversation -> toResponseDto(conversation, unreadCounts.getOrDefault(conversation.getId(), 0L)))
-                .toList();
+        PaginationResponse<ConversationDto> body = PaginationUtils.toCursorResponse(
+                fetchedConversationIds,
+                page,
+                conversationId -> {
+                    ConversationEntity conversation = conversationsById.get(conversationId);
+                    return toResponseDto(conversation, unreadCounts.getOrDefault(conversationId, 0L));
+                },
+                conversationId -> conversationCursor(conversationsById.get(conversationId)),
+                false);
 
         return new BaseResponse<>(body, "Conversations retrieved successfully.", HttpStatus.OK.value());
     }
@@ -104,31 +116,24 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
-    @Transactional(readOnly = true)
     public BaseResponse<PaginationResponse<MessageDto>> getMessages(UUID conversationId, PaginationRequest request) {
         UserSecurity currentUser = Security.getCurrentUser();
-        int limit = PaginationUtils.resolveLimit(
-                request == null ? null : request.limit(), DEFAULT_MESSAGE_LIMIT, MAX_MESSAGE_LIMIT);
 
-        if (limit < 1) return new BaseResponse<>(null, "Limit must be greater than 0.", HttpStatus.BAD_REQUEST.value());
-
-        LocalDateTime cursor;
-        try {
-            cursor = PaginationUtils.parseDateTimeCursor(request == null ? null : request.cursor());
-        } catch (DateTimeParseException ex) {
-            return new BaseResponse<>(null, "Cursor is invalid.", HttpStatus.BAD_REQUEST.value());
-        }
+        PaginationUtils.CursorPage page = PaginationUtils.resolveCursorPage(request);
 
         ensureCanReadConversation(conversationId, currentUser.id());
 
-        PageRequest pageRequest = PageRequest.of(0, PaginationUtils.fetchLimit(limit));
-        List<MessageEntity> fetchedMessages = cursor == null
-                ? messageRepository.findLatestMessages(conversationId, pageRequest)
-                : messageRepository.findMessagesBeforeCursor(conversationId, cursor, pageRequest);
+        List<MessageEntity> fetchedMessages = page.cursor() == null
+                ? messageRepository.findLatestMessages(conversationId, page.pageRequest())
+                : messageRepository.findMessagesBeforeCursor(conversationId, page.cursor(), page.pageRequest());
 
         PaginationResponse<MessageDto> body = PaginationUtils.toCursorResponse(
-                fetchedMessages, limit, messageMapper::toDto, MessageEntity::getCreatedAt, true);
+                fetchedMessages, page, messageMapper::toDto, MessageEntity::getCreatedAt, true);
         return new BaseResponse<>(body, "Messages retrieved successfully.", HttpStatus.OK.value());
+    }
+
+    private LocalDateTime conversationCursor(ConversationEntity conversation) {
+        return conversation.getLastMessageAt() == null ? conversation.getUpdatedAt() : conversation.getLastMessageAt();
     }
 
     private void ensureCanReadConversation(UUID conversationId, UUID userId) {

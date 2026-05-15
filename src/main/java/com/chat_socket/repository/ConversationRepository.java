@@ -2,9 +2,12 @@ package com.chat_socket.repository;
 
 import com.chat_socket.entity.ConversationEntity;
 import com.chat_socket.enums.ConversationType;
+import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,9 +26,42 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
             @Param("type") ConversationType type, @Param("userAId") UUID userAId, @Param("userBId") UUID userBId);
 
     @Query("""
-            SELECT DISTINCT c
+            SELECT c.id
             FROM ConversationEntity c
             JOIN c.participants currentParticipant
+            WHERE currentParticipant.user.id = :userId
+                AND currentParticipant.leftAt IS NULL
+                AND currentParticipant.deletedAt IS NULL
+                AND (:type IS NULL OR c.type = :type)
+            ORDER BY
+                COALESCE(c.lastMessageAt, c.updatedAt) DESC,
+                c.id DESC
+            """)
+    List<UUID> findActiveConversationIdsForUser(
+            @Param("userId") UUID userId, @Param("type") ConversationType type, Pageable pageable);
+
+    @Query("""
+            SELECT c.id
+            FROM ConversationEntity c
+            JOIN c.participants currentParticipant
+            WHERE currentParticipant.user.id = :userId
+                AND currentParticipant.leftAt IS NULL
+                AND currentParticipant.deletedAt IS NULL
+                AND (:type IS NULL OR c.type = :type)
+                AND COALESCE(c.lastMessageAt, c.updatedAt) < :cursor
+            ORDER BY
+                COALESCE(c.lastMessageAt, c.updatedAt) DESC,
+                c.id DESC
+            """)
+    List<UUID> findActiveConversationIdsForUserBeforeCursor(
+            @Param("userId") UUID userId,
+            @Param("type") ConversationType type,
+            @Param("cursor") LocalDateTime cursor,
+            Pageable pageable);
+
+    @Query("""
+            SELECT DISTINCT c
+            FROM ConversationEntity c
             LEFT JOIN FETCH c.participants participant
             LEFT JOIN FETCH participant.user
             LEFT JOIN FETCH c.lastMessage lastMessage
@@ -33,12 +69,7 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
             LEFT JOIN FETCH c.createdBy
             LEFT JOIN FETCH c.directUserA
             LEFT JOIN FETCH c.directUserB
-            WHERE currentParticipant.user.id = :userId
-                AND currentParticipant.leftAt IS NULL
-                AND currentParticipant.deletedAt IS NULL
-            ORDER BY
-                c.lastMessageAt DESC NULLS LAST,
-                c.updatedAt DESC
+            WHERE c.id IN :conversationIds
             """)
-    List<ConversationEntity> findActiveConversationsForUser(@Param("userId") UUID userId);
+    List<ConversationEntity> findConversationsWithDetails(@Param("conversationIds") Collection<UUID> conversationIds);
 }

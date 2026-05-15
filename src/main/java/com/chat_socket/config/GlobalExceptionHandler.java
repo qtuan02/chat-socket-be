@@ -1,6 +1,7 @@
 package com.chat_socket.config;
 
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.exception.BadRequestException;
 import com.chat_socket.exception.ForbiddenException;
 import com.chat_socket.exception.FriendPermissionException;
 import com.chat_socket.exception.NotFoundException;
@@ -69,5 +70,11 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)
                 .body(new BaseResponse<>(
                         Map.of("notFriends", ex.getNotFriends()), ex.getMessage(), HttpStatus.FORBIDDEN.value()));
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    ResponseEntity<Object> handleBadRequestException(BadRequestException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(new BaseResponse<>(null, ex.getMessage(), HttpStatus.BAD_REQUEST.value()));
     }
 }
