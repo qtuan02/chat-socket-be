@@ -4,6 +4,7 @@ import com.chat_socket.dto.UserSecurity;
 import com.chat_socket.entity.UserEntity;
 import com.chat_socket.service.JwtService;
 import io.jsonwebtoken.JwtException;
+import java.security.Principal;
 import java.util.Collections;
 import java.util.UUID;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -35,5 +36,16 @@ public class Security {
                 user.getEmail(),
                 user.getAvatarUrl());
         return new UsernamePasswordAuthenticationToken(userSecurity, null, Collections.emptyList());
+    }
+
+    public static UserSecurity getUserSecurityFromPrincipal(Principal principal) {
+        try {
+            if (principal instanceof Authentication authentication
+                    && authentication.getPrincipal() instanceof UserSecurity user) {
+                return user;
+            }
+        } catch (IllegalArgumentException exception) {
+        }
+        return null;
     }
 }

@@ -1,6 +1,7 @@
 package com.chat_socket.config;
 
 import com.chat_socket.ApplicationYaml;
+import com.chat_socket.constant.SocketChannel;
 import com.chat_socket.security.SocketChannelInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
@@ -28,8 +29,8 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry registry) {
-        registry.setApplicationDestinationPrefixes("/app");
-        registry.enableSimpleBroker("/topic", "/queue");
+        registry.setApplicationDestinationPrefixes(SocketChannel.APP);
+        registry.enableSimpleBroker(SocketChannel.TOPIC, SocketChannel.QUEUE);
     }
 
     @Override
