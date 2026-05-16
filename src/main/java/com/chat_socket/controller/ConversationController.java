@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -50,6 +51,12 @@ public class ConversationController {
     public ResponseEntity<BaseResponse<PaginationResponse<MessageDto>>> getMessages(
             @PathVariable UUID conversationId, @ModelAttribute PaginationRequest request) {
         BaseResponse<PaginationResponse<MessageDto>> body = conversationService.getMessages(conversationId, request);
+        return ResponseEntity.status(body.status()).body(body);
+    }
+
+    @PatchMapping("/{conversationId}/seen")
+    public ResponseEntity<BaseResponse<Void>> markAsSeen(@PathVariable UUID conversationId) {
+        BaseResponse<Void> body = conversationService.markAsSeen(conversationId);
         return ResponseEntity.status(body.status()).body(body);
     }
 }

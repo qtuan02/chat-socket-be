@@ -10,4 +10,6 @@ public record ConversationParticipantDto(
         String lastName,
         String avatarUrl,
         ParticipantRole role,
-        LocalDateTime joinedAt) {}
+        LocalDateTime joinedAt,
+        UUID lastReadMessageId,
+        LocalDateTime lastReadAt) {}

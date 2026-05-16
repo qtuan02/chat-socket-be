@@ -24,6 +24,7 @@ import com.chat_socket.repository.MessageRepository;
 import com.chat_socket.repository.ParticipantRepository;
 import com.chat_socket.repository.UserRepository;
 import com.chat_socket.service.ConversationService;
+import com.chat_socket.socket.SocketPublisher;
 import com.chat_socket.utils.Normalize;
 import com.chat_socket.utils.PaginationUtils;
 import com.chat_socket.utils.Security;
@@ -46,18 +47,21 @@ public class ConversationServiceImpl implements ConversationService {
     private final ParticipantRepository participantRepository;
     private final UserRepository userRepository;
     private final MessageMapper messageMapper;
+    private final SocketPublisher socketPublisher;
 
     public ConversationServiceImpl(
             ConversationRepository conversationRepository,
             MessageRepository messageRepository,
             ParticipantRepository participantRepository,
             UserRepository userRepository,
-            MessageMapper messageMapper) {
+            MessageMapper messageMapper,
+            SocketPublisher socketPublisher) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.participantRepository = participantRepository;
         this.userRepository = userRepository;
         this.messageMapper = messageMapper;
+        this.socketPublisher = socketPublisher;
     }
 
     @Override
@@ -130,6 +134,43 @@ public class ConversationServiceImpl implements ConversationService {
         PaginationResponse<MessageDto> body = PaginationUtils.toCursorResponse(
                 fetchedMessages, page, messageMapper::toDto, MessageEntity::getCreatedAt, true);
         return new BaseResponse<>(body, "Messages retrieved successfully.", HttpStatus.OK.value());
+    }
+
+    @Override
+    @Transactional
+    public BaseResponse<Void> markAsSeen(UUID conversationId) {
+        UserSecurity currentUser = Security.getCurrentUser();
+        ConversationEntity conversation = conversationRepository
+                .findById(conversationId)
+                .orElseThrow(() -> new NotFoundException("Conversation not found."));
+        ParticipantEntity participant = participantRepository
+                .findByIdConversationIdAndIdUserId(conversationId, currentUser.id())
+                .orElseThrow(() -> new ForbiddenException("You are not a participant of this conversation."));
+
+        if (participant.getLeftAt() != null || participant.getDeletedAt() != null)
+            throw new ForbiddenException("You are not a participant of this conversation.");
+
+        MessageEntity lastMessage = conversation.getLastMessage();
+        if (lastMessage == null) return new BaseResponse<>(null, "No messages to mark as seen.", HttpStatus.OK.value());
+
+        if (participant.getLastReadMessage() != null
+                && participant.getLastReadMessage().getId().equals(lastMessage.getId()))
+            return new BaseResponse<>(null, "Messages already marked as seen.", HttpStatus.OK.value());
+
+        LocalDateTime seenAt = LocalDateTime.now();
+
+        participant.setLastReadMessage(lastMessage);
+        participant.setLastReadAt(seenAt);
+        participantRepository.save(participant);
+
+        socketPublisher.publishConversationSeenAfterCommit(
+                conversationId,
+                currentUser.id(),
+                messageMapper.toDto(lastMessage),
+                conversation.getLastMessageAt(),
+                seenAt);
+
+        return new BaseResponse<>(null, "Messages marked as seen successfully.", HttpStatus.OK.value());
     }
 
     private LocalDateTime conversationCursor(ConversationEntity conversation) {
@@ -277,7 +318,11 @@ public class ConversationServiceImpl implements ConversationService {
                                     user.getLastName(),
                                     user.getAvatarUrl(),
                                     p.getRole(),
-                                    p.getJoinedAt());
+                                    p.getJoinedAt(),
+                                    p.getLastReadMessage() == null
+                                            ? null
+                                            : p.getLastReadMessage().getId(),
+                                    p.getLastReadAt());
                         })
                         .toList());
     }

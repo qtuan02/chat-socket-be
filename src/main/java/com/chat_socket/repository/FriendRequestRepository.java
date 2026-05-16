@@ -2,6 +2,7 @@ package com.chat_socket.repository;
 
 import com.chat_socket.entity.FriendRequestEntity;
 import com.chat_socket.enums.FriendRequestStatus;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -40,4 +41,20 @@ public interface FriendRequestRepository extends JpaRepository<FriendRequestEnti
             """)
     List<FriendRequestEntity> findFriendRequestsReceivedOfUser(
             @Param("userId") UUID userId, @Param("status") FriendRequestStatus status);
+
+    @Query("""
+            SELECT fr
+            FROM FriendRequestEntity fr
+            JOIN FETCH fr.fromUser
+            JOIN FETCH fr.toUser
+            WHERE fr.status = :status
+                AND (
+                    (fr.fromUser.id = :userId AND fr.toUser.id IN :userIds)
+                    OR (fr.toUser.id = :userId AND fr.fromUser.id IN :userIds)
+                )
+            """)
+    List<FriendRequestEntity> findFriendRequestsBetweenUserAndUsers(
+            @Param("userId") UUID userId,
+            @Param("userIds") Collection<UUID> userIds,
+            @Param("status") FriendRequestStatus status);
 }

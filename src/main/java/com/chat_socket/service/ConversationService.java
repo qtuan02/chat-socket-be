@@ -16,4 +16,6 @@ public interface ConversationService {
     BaseResponse<ConversationDto> createConversation(ConversationRequest request);
 
     BaseResponse<PaginationResponse<MessageDto>> getMessages(UUID conversationId, PaginationRequest request);
+
+    BaseResponse<Void> markAsSeen(UUID conversationId);
 }

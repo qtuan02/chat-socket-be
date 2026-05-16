@@ -3,6 +3,7 @@ package com.chat_socket.socket;
 import com.chat_socket.constant.SocketChannel;
 import com.chat_socket.dto.ConversationDelivery;
 import com.chat_socket.dto.ConversationEvent;
+import com.chat_socket.dto.ConversationSeenEvent;
 import com.chat_socket.dto.MessageDto;
 import com.chat_socket.repository.MessageRepository;
 import com.chat_socket.repository.ParticipantRepository;
@@ -46,6 +47,27 @@ public class SocketPublisher {
                     socketEmitter.emitTo(SocketChannel.CONVERSATION_QUEUE, delivery.event(), delivery.userId()));
         };
 
+        publishAfterCommit(publish);
+    }
+
+    public void publishConversationSeenAfterCommit(
+            UUID conversationId,
+            UUID userId,
+            MessageDto lastMessage,
+            LocalDateTime lastMessageAt,
+            LocalDateTime seenAt) {
+        ConversationEvent event = ConversationEvent.updated(conversationId, lastMessage, lastMessageAt, 0);
+        ConversationSeenEvent seenEvent = ConversationSeenEvent.seen(conversationId, userId, lastMessage.id(), seenAt);
+
+        Runnable publish = () -> {
+            socketEmitter.emit(SocketChannel.CONVERSATION_SEEN_TOPIC.formatted(conversationId), seenEvent);
+            socketEmitter.emitTo(SocketChannel.CONVERSATION_QUEUE, event, userId);
+        };
+
+        publishAfterCommit(publish);
+    }
+
+    private void publishAfterCommit(Runnable publish) {
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
             publish.run();
             return;
