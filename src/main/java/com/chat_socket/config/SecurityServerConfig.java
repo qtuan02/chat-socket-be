@@ -1,5 +1,6 @@
 package com.chat_socket.config;
 
+import com.chat_socket.ApplicationYaml;
 import com.chat_socket.security.SecurityFilter;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
@@ -21,6 +22,12 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityServerConfig {
+    private final ApplicationYaml applicationYaml;
+
+    SecurityServerConfig(ApplicationYaml applicationYaml) {
+        this.applicationYaml = applicationYaml;
+    }
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder(10);
@@ -47,7 +54,7 @@ public class SecurityServerConfig {
         config.setAllowCredentials(true);
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedOrigins(List.of("http://localhost:3000"));
+        config.setAllowedOrigins(List.of(applicationYaml.clientUrl()));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

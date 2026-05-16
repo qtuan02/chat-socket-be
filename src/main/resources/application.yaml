@@ -1,0 +1,26 @@
+spring:
+  mvc:
+    servlet:
+      path: ${SPRING_MVC_SERVLET_PATH:/api}
+  application:
+    name: ${SPRING_APPLICATION_NAME:chat-socket}
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/chat-socket-db}
+    username: ${SPRING_DATASOURCE_USERNAME:admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:123456}
+  data:
+    redis:
+      url: ${SPRING_DATA_REDIS_URL:redis://localhost:6379}
+  jpa:
+    hibernate:
+      ddl-auto: ${SPRING_JPA_HIBERNATE_DDL_AUTO:none}
+    show-sql: ${SPRING_JPA_SHOW_SQL:true}
+
+server:
+  port: ${PORT:8089}
+
+chat-socket:
+  access-token-secret: ${CHAT_SOCKET_ACCESS_TOKEN_SECRET:secret-key}
+  access-token-ttl: ${CHAT_SOCKET_ACCESS_TOKEN_TTL:15} # minutes
+  refresh-token-ttl: ${CHAT_SOCKET_REFRESH_TOKEN_TTL:14} # days
+  client-url: ${CHAT_SOCKET_CLIENT_URL:http://localhost:3000}
