@@ -35,4 +35,9 @@ public class UserOnlineRegistry {
 
         return userIds.stream().map(UUID::fromString).collect(Collectors.toUnmodifiableSet());
     }
+
+    public void clearOnlineUsers() {
+        redisUtils.delete(Redis.ONLINE_USERS_KEY + "*");
+        redisUtils.delete(Redis.USER_SESSIONS_KEY_PREFIX + "*");
+    }
 }

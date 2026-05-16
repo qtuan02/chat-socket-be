@@ -4,9 +4,11 @@ import com.chat_socket.dto.BaseResponse;
 import com.chat_socket.dto.ConversationDto;
 import com.chat_socket.dto.ConversationParticipantDto;
 import com.chat_socket.dto.ConversationRequest;
+import com.chat_socket.dto.GroupMembersRequest;
 import com.chat_socket.dto.MessageDto;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
+import com.chat_socket.dto.UpdateGroupRequest;
 import com.chat_socket.dto.UserPair;
 import com.chat_socket.dto.UserSecurity;
 import com.chat_socket.entity.ConversationEntity;
@@ -16,10 +18,13 @@ import com.chat_socket.entity.ParticipantIdEntity;
 import com.chat_socket.entity.UserEntity;
 import com.chat_socket.enums.ConversationType;
 import com.chat_socket.enums.ParticipantRole;
+import com.chat_socket.exception.BadRequestException;
 import com.chat_socket.exception.ForbiddenException;
+import com.chat_socket.exception.FriendPermissionException;
 import com.chat_socket.exception.NotFoundException;
 import com.chat_socket.mapper.MessageMapper;
 import com.chat_socket.repository.ConversationRepository;
+import com.chat_socket.repository.FriendRepository;
 import com.chat_socket.repository.MessageRepository;
 import com.chat_socket.repository.ParticipantRepository;
 import com.chat_socket.repository.UserRepository;
@@ -46,6 +51,7 @@ public class ConversationServiceImpl implements ConversationService {
     private final MessageRepository messageRepository;
     private final ParticipantRepository participantRepository;
     private final UserRepository userRepository;
+    private final FriendRepository friendRepository;
     private final MessageMapper messageMapper;
     private final SocketPublisher socketPublisher;
 
@@ -54,12 +60,14 @@ public class ConversationServiceImpl implements ConversationService {
             MessageRepository messageRepository,
             ParticipantRepository participantRepository,
             UserRepository userRepository,
+            FriendRepository friendRepository,
             MessageMapper messageMapper,
             SocketPublisher socketPublisher) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.participantRepository = participantRepository;
         this.userRepository = userRepository;
+        this.friendRepository = friendRepository;
         this.messageMapper = messageMapper;
         this.socketPublisher = socketPublisher;
     }
@@ -99,7 +107,12 @@ public class ConversationServiceImpl implements ConversationService {
                     ConversationEntity conversation = conversationsById.get(conversationId);
                     return toResponseDto(conversation, unreadCounts.getOrDefault(conversationId, 0L));
                 },
-                conversationId -> conversationCursor(conversationsById.get(conversationId)),
+                conversationId -> {
+                    ConversationEntity conversation = conversationsById.get(conversationId);
+                    return conversation.getLastMessageAt() == null
+                            ? conversation.getUpdatedAt()
+                            : conversation.getLastMessageAt();
+                },
                 false);
 
         return new BaseResponse<>(body, "Conversations retrieved successfully.", HttpStatus.OK.value());
@@ -173,8 +186,202 @@ public class ConversationServiceImpl implements ConversationService {
         return new BaseResponse<>(null, "Messages marked as seen successfully.", HttpStatus.OK.value());
     }
 
-    private LocalDateTime conversationCursor(ConversationEntity conversation) {
-        return conversation.getLastMessageAt() == null ? conversation.getUpdatedAt() : conversation.getLastMessageAt();
+    @Override
+    @Transactional
+    public BaseResponse<ConversationDto> updateGroup(UUID conversationId, UpdateGroupRequest request) {
+        if (request == null || request.name() == null || request.name().isBlank()) {
+            throw new BadRequestException("Group name is required.");
+        }
+
+        UserSecurity currentUser = Security.getCurrentUser();
+        ConversationEntity conversation = getGroupConversationOrThrow(conversationId);
+        getActiveParticipantOrThrow(conversationId, currentUser.id());
+
+        conversation.setGroupName(request.name().trim());
+        conversationRepository.save(conversation);
+
+        ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
+
+        MessageDto lastMessage =
+                conversation.getLastMessage() == null ? null : messageMapper.toDto(conversation.getLastMessage());
+        socketPublisher.publishConversationUpdatedAfterCommit(
+                conversation.getId(), lastMessage, conversation.getLastMessageAt());
+
+        return new BaseResponse<>(
+                toResponseDto(updatedConversation), "Group updated successfully.", HttpStatus.OK.value());
+    }
+
+    @Override
+    @Transactional
+    public BaseResponse<ConversationDto> addGroupMembers(UUID conversationId, GroupMembersRequest request) {
+        if (request == null
+                || request.memberIds() == null
+                || request.memberIds().isEmpty()) {
+            throw new BadRequestException("Member ids are required.");
+        }
+
+        UserSecurity currentUser = Security.getCurrentUser();
+        ConversationEntity conversation = getGroupConversationOrThrow(conversationId);
+        getActiveParticipantOrThrow(conversationId, currentUser.id());
+
+        LinkedHashSet<UUID> uniqueMemberIds = new LinkedHashSet<>(request.memberIds());
+        uniqueMemberIds.remove(currentUser.id());
+
+        if (uniqueMemberIds.isEmpty()) {
+            ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
+            return new BaseResponse<>(
+                    toResponseDto(updatedConversation), "Members already in group.", HttpStatus.OK.value());
+        }
+
+        ensureFriendWithAllMembers(currentUser.id(), new ArrayList<>(uniqueMemberIds));
+
+        Map<UUID, UserEntity> usersById = userRepository.findAllById(uniqueMemberIds).stream()
+                .collect(Collectors.toMap(UserEntity::getId, Function.identity()));
+        if (usersById.size() != uniqueMemberIds.size())
+            throw new NotFoundException("One or more members were not found.");
+
+        Map<UUID, ParticipantEntity> existingParticipants =
+                participantRepository.findByConversationIdAndIdUserIdIn(conversationId, uniqueMemberIds).stream()
+                        .collect(Collectors.toMap(
+                                participant -> participant.getId().getUserId(), Function.identity()));
+
+        boolean hasChanges = false;
+        LocalDateTime now = LocalDateTime.now();
+        for (UUID memberId : uniqueMemberIds) {
+            ParticipantEntity participant = existingParticipants.get(memberId);
+            if (participant == null) {
+                createParticipant(conversation, usersById.get(memberId), ParticipantRole.MEMBER);
+                hasChanges = true;
+                continue;
+            }
+
+            if (participant.getLeftAt() != null || participant.getDeletedAt() != null) {
+                participant.setLeftAt(null);
+                participant.setDeletedAt(null);
+                participant.setRole(ParticipantRole.MEMBER);
+                participant.setJoinedAt(now);
+                participantRepository.save(participant);
+                hasChanges = true;
+            }
+        }
+
+        if (hasChanges) conversationRepository.save(conversation);
+
+        ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
+
+        MessageDto lastMessage =
+                conversation.getLastMessage() == null ? null : messageMapper.toDto(conversation.getLastMessage());
+        socketPublisher.publishConversationUpdatedAfterCommit(
+                conversation.getId(), lastMessage, conversation.getLastMessageAt());
+
+        return new BaseResponse<>(
+                toResponseDto(updatedConversation), "Members added successfully.", HttpStatus.OK.value());
+    }
+
+    @Override
+    @Transactional
+    public BaseResponse<ConversationDto> removeGroupMember(UUID conversationId, UUID memberId) {
+        if (memberId == null) throw new BadRequestException("Member id is required.");
+
+        UserSecurity currentUser = Security.getCurrentUser();
+        ConversationEntity conversation = getGroupConversationOrThrow(conversationId);
+        ParticipantEntity currentParticipant = getActiveParticipantOrThrow(conversationId, currentUser.id());
+        if (currentParticipant.getRole() != ParticipantRole.ADMIN)
+            throw new ForbiddenException("Only admins can manage group members.");
+
+        if (currentUser.id().equals(memberId))
+            throw new BadRequestException("You cannot remove yourself. Use leave endpoint instead.");
+
+        ParticipantEntity targetParticipant = participantRepository
+                .findByIdConversationIdAndIdUserId(conversationId, memberId)
+                .orElseThrow(() -> new NotFoundException("Participant not found."));
+        if (targetParticipant.getLeftAt() != null || targetParticipant.getDeletedAt() != null)
+            throw new NotFoundException("Participant not found.");
+        if (targetParticipant.getRole() == ParticipantRole.ADMIN)
+            throw new BadRequestException("You cannot remove an admin from this group.");
+
+        targetParticipant.setLeftAt(LocalDateTime.now());
+        participantRepository.save(targetParticipant);
+        conversationRepository.save(conversation);
+
+        ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
+
+        MessageDto lastMessage =
+                conversation.getLastMessage() == null ? null : messageMapper.toDto(conversation.getLastMessage());
+        socketPublisher.publishConversationUpdatedAfterCommit(
+                conversation.getId(), lastMessage, conversation.getLastMessageAt());
+
+        return new BaseResponse<>(
+                toResponseDto(updatedConversation), "Member removed from group successfully.", HttpStatus.OK.value());
+    }
+
+    @Override
+    @Transactional
+    public BaseResponse<Void> leaveGroup(UUID conversationId) {
+        UserSecurity currentUser = Security.getCurrentUser();
+        ConversationEntity conversation = getGroupConversationOrThrow(conversationId);
+        ParticipantEntity currentParticipant = getActiveParticipantOrThrow(conversationId, currentUser.id());
+
+        if (currentParticipant.getRole() == ParticipantRole.ADMIN) {
+            long activeAdmins = participantRepository.countActiveByConversationIdAndRoleAndIdUserIdNot(
+                    conversationId, ParticipantRole.ADMIN, currentUser.id());
+            if (activeAdmins == 0)
+                throw new BadRequestException("You are the only admin. Assign another admin before leaving.");
+        }
+
+        currentParticipant.setLeftAt(LocalDateTime.now());
+        participantRepository.save(currentParticipant);
+        conversationRepository.save(conversation);
+
+        MessageDto lastMessage =
+                conversation.getLastMessage() == null ? null : messageMapper.toDto(conversation.getLastMessage());
+        socketPublisher.publishConversationUpdatedAfterCommit(
+                conversation.getId(), lastMessage, conversation.getLastMessageAt());
+
+        return new BaseResponse<>(null, "Left group successfully.", HttpStatus.OK.value());
+    }
+
+    private ConversationEntity getGroupConversationOrThrow(UUID conversationId) {
+        ConversationEntity conversation = conversationRepository
+                .findById(conversationId)
+                .orElseThrow(() -> new NotFoundException("Conversation not found."));
+
+        if (conversation.getType() != ConversationType.GROUP)
+            throw new NotFoundException("Group conversation not found.");
+
+        return conversation;
+    }
+
+    private ParticipantEntity getActiveParticipantOrThrow(UUID conversationId, UUID userId) {
+        ParticipantEntity participant = participantRepository
+                .findByIdConversationIdAndIdUserId(conversationId, userId)
+                .orElseThrow(() -> new ForbiddenException("You are not a participant of this conversation."));
+
+        if (participant.getLeftAt() != null || participant.getDeletedAt() != null)
+            throw new ForbiddenException("You are not a participant of this conversation.");
+
+        return participant;
+    }
+
+    private void ensureFriendWithAllMembers(UUID currentUserId, List<UUID> memberIds) {
+        List<UUID> notFriends = new ArrayList<>();
+        for (UUID memberId : memberIds) {
+            if (memberId == null) continue;
+
+            UserPair pair = Normalize.normalizeUserPair(currentUserId, memberId);
+            if (!friendRepository.existsByUserAIdAndUserBId(pair.userAId(), pair.userBId())) {
+                notFriends.add(memberId);
+            }
+        }
+
+        if (!notFriends.isEmpty())
+            throw new FriendPermissionException("You can only add friends to a group.", notFriends);
+    }
+
+    private ConversationEntity findConversationWithDetails(UUID conversationId) {
+        return conversationRepository.findConversationsWithDetails(List.of(conversationId)).stream()
+                .findFirst()
+                .orElseThrow(() -> new NotFoundException("Conversation not found."));
     }
 
     private void ensureCanReadConversation(UUID conversationId, UUID userId) {

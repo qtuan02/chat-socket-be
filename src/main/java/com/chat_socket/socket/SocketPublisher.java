@@ -50,6 +50,20 @@ public class SocketPublisher {
         publishAfterCommit(publish);
     }
 
+    public void publishConversationUpdatedAfterCommit(
+            UUID conversationId, MessageDto lastMessage, LocalDateTime lastMessageAt) {
+        List<ConversationDelivery> updateDeliveries =
+                participantRepository.findActiveUserIdsByConversationId(conversationId).stream()
+                        .map(userId -> new ConversationDelivery(
+                                userId, ConversationEvent.updated(conversationId, lastMessage, lastMessageAt, 0)))
+                        .toList();
+
+        Runnable publish = () -> updateDeliveries.forEach(delivery ->
+                socketEmitter.emitTo(SocketChannel.CONVERSATION_QUEUE, delivery.event(), delivery.userId()));
+
+        publishAfterCommit(publish);
+    }
+
     public void publishConversationSeenAfterCommit(
             UUID conversationId,
             UUID userId,
