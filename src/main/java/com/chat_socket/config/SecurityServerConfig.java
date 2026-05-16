@@ -1,6 +1,7 @@
 package com.chat_socket.config;
 
 import com.chat_socket.ApplicationYaml;
+import com.chat_socket.constant.RouteApi;
 import com.chat_socket.security.SecurityFilter;
 import java.util.List;
 import org.springframework.context.annotation.Bean;
@@ -38,12 +39,13 @@ public class SecurityServerConfig {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(auth -> auth.requestMatchers("/v1/auth/**", "/ws*")
-                        .permitAll()
-                        .requestMatchers(HttpMethod.OPTIONS, "/**")
-                        .permitAll()
-                        .anyRequest()
-                        .authenticated())
+                .authorizeHttpRequests(
+                        auth -> auth.requestMatchers(RouteApi.AUTH_API + "/**", RouteApi.HEALTH_API, "/ws*")
+                                .permitAll()
+                                .requestMatchers(HttpMethod.OPTIONS, "/**")
+                                .permitAll()
+                                .anyRequest()
+                                .authenticated())
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
