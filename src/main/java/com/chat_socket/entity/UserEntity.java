@@ -1,10 +1,14 @@
 package com.chat_socket.entity;
 
 import com.chat_socket.constant.TableName;
+import com.chat_socket.utils.Normalize;
 import com.chat_socket.utils.UUIDv7;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -20,7 +24,12 @@ import org.hibernate.annotations.UpdateTimestamp;
 @Entity
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = TableName.USER_TABLE)
+@Table(
+        name = TableName.USER_TABLE,
+        indexes = {
+            @Index(name = "idx_users_normalized_name", columnList = "normalized_name"),
+            @Index(name = "idx_users_username", columnList = "username")
+        })
 public class UserEntity {
     @Id
     @UUIDv7
@@ -38,6 +47,9 @@ public class UserEntity {
 
     @Column(name = "last_name", nullable = false, length = 30)
     private String lastName;
+
+    @Column(name = "normalized_name", nullable = false, length = 120)
+    private String normalizedName;
 
     @Column(name = "email", nullable = false, unique = true, length = 255)
     private String email;
@@ -61,4 +73,10 @@ public class UserEntity {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @PrePersist
+    @PreUpdate
+    private void updateNormalizedName() {
+        normalizedName = Normalize.normalizeFullName(firstName, lastName);
+    }
 }

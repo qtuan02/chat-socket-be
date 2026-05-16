@@ -1,6 +1,12 @@
 package com.chat_socket.dto;
 
+import java.security.Principal;
 import java.util.UUID;
 
-public record UserSecurity(
-        UUID id, String username, String firstName, String lastName, String email, String avatarUrl) {}
+public record UserSecurity(UUID id, String username, String firstName, String lastName, String email, String avatarUrl)
+        implements Principal {
+    @Override
+    public String getName() {
+        return id.toString();
+    }
+}

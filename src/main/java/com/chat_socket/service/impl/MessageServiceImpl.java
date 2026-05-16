@@ -20,6 +20,7 @@ import com.chat_socket.repository.MessageRepository;
 import com.chat_socket.repository.ParticipantRepository;
 import com.chat_socket.repository.UserRepository;
 import com.chat_socket.service.MessageService;
+import com.chat_socket.socket.SocketPublisher;
 import com.chat_socket.utils.Normalize;
 import com.chat_socket.utils.Security;
 import java.time.LocalDateTime;
@@ -35,18 +36,21 @@ public class MessageServiceImpl implements MessageService {
     private final ParticipantRepository participantRepository;
     private final UserRepository userRepository;
     private final MessageMapper messageMapper;
+    private final SocketPublisher socketPublisher;
 
     public MessageServiceImpl(
             ConversationRepository conversationRepository,
             MessageRepository messageRepository,
             ParticipantRepository participantRepository,
             UserRepository userRepository,
-            MessageMapper messageMapper) {
+            MessageMapper messageMapper,
+            SocketPublisher socketPublisher) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.participantRepository = participantRepository;
         this.userRepository = userRepository;
         this.messageMapper = messageMapper;
+        this.socketPublisher = socketPublisher;
     }
 
     @Override
@@ -73,9 +77,12 @@ public class MessageServiceImpl implements MessageService {
                 userRepository.findById(senderId).orElseThrow(() -> new NotFoundException("User not found."));
 
         MessageEntity message = createMessage(conversation, sender, request);
+        MessageDto messageDto = messageMapper.toDto(message);
 
-        return new BaseResponse<>(
-                messageMapper.toDto(message), "Message sent successfully.", HttpStatus.CREATED.value());
+        socketPublisher.publishMessageAfterCommit(
+                conversation.getId(), messageMapper.toDto(message), conversation.getLastMessageAt());
+
+        return new BaseResponse<>(messageDto, "Message sent successfully.", HttpStatus.CREATED.value());
     }
 
     @Override
@@ -95,9 +102,11 @@ public class MessageServiceImpl implements MessageService {
                 userRepository.findById(senderId).orElseThrow(() -> new NotFoundException("User not found."));
 
         MessageEntity message = createMessage(conversation, sender, request);
+        MessageDto messageDto = messageMapper.toDto(message);
 
-        return new BaseResponse<>(
-                messageMapper.toDto(message), "Message sent successfully.", HttpStatus.CREATED.value());
+        socketPublisher.publishMessageAfterCommit(conversation.getId(), messageDto, conversation.getLastMessageAt());
+
+        return new BaseResponse<>(messageDto, "Message sent successfully.", HttpStatus.CREATED.value());
     }
 
     private MessageEntity createMessage(ConversationEntity conversation, UserEntity sender, MessageRequest request) {
