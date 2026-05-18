@@ -64,6 +64,11 @@ public class SocketPublisher {
         publishAfterCommit(publish);
     }
 
+    public void publishGroupDeletedAfterCommit(UUID conversationId, UUID userId) {
+        ConversationEvent event = ConversationEvent.groupDeleted(conversationId);
+        publishAfterCommit(() -> socketEmitter.emitTo(SocketChannel.CONVERSATION_QUEUE, event, userId));
+    }
+
     public void publishConversationSeenAfterCommit(
             UUID conversationId,
             UUID userId,

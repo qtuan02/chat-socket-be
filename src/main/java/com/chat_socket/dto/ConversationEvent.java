@@ -9,4 +9,8 @@ public record ConversationEvent(
             UUID conversationId, MessageDto lastMessage, LocalDateTime lastMessageAt, long unreadCount) {
         return new ConversationEvent("conversation.updated", conversationId, lastMessage, lastMessageAt, unreadCount);
     }
+
+    public static ConversationEvent groupDeleted(UUID conversationId) {
+        return new ConversationEvent("group.deleted", conversationId, null, null, 0);
+    }
 }

@@ -4,10 +4,7 @@ import com.chat_socket.dto.AcceptFriendResponse;
 import com.chat_socket.dto.BaseResponse;
 import com.chat_socket.dto.FriendActionRequest;
 import com.chat_socket.dto.FriendDto;
-import com.chat_socket.dto.FriendRequestReceviedDto;
 import com.chat_socket.dto.FriendRequestResponse;
-import com.chat_socket.dto.FriendRequestSentDto;
-import com.chat_socket.dto.FriendSearchDto;
 import com.chat_socket.dto.FriendSendRequest;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
@@ -17,8 +14,8 @@ import com.chat_socket.entity.FriendEntity;
 import com.chat_socket.entity.FriendRequestEntity;
 import com.chat_socket.entity.UserEntity;
 import com.chat_socket.enums.FriendRequestStatus;
-import com.chat_socket.enums.FriendSearchStatus;
 import com.chat_socket.exception.NotFoundException;
+import com.chat_socket.mapper.FriendMapper;
 import com.chat_socket.mapper.FriendRequestMapper;
 import com.chat_socket.repository.FriendRepository;
 import com.chat_socket.repository.FriendRequestRepository;
@@ -28,32 +25,29 @@ import com.chat_socket.utils.Normalize;
 import com.chat_socket.utils.PaginationUtils;
 import com.chat_socket.utils.Security;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class FriendServiceImpl implements FriendService {
-    private static final int USERNAME_SEARCH_LIMIT = 20;
-
     private final UserRepository userRepository;
     private final FriendRepository friendRepository;
     private final FriendRequestRepository friendRequestRepository;
+    private final FriendMapper friendMapper;
     private final FriendRequestMapper friendRequestMapper;
 
     public FriendServiceImpl(
             UserRepository userRepository,
             FriendRepository friendRepository,
             FriendRequestRepository friendRequestRepository,
+            FriendMapper friendMapper,
             FriendRequestMapper friendRequestMapper) {
         this.userRepository = userRepository;
         this.friendRepository = friendRepository;
         this.friendRequestRepository = friendRequestRepository;
+        this.friendMapper = friendMapper;
         this.friendRequestMapper = friendRequestMapper;
     }
 
@@ -62,73 +56,15 @@ public class FriendServiceImpl implements FriendService {
         UserSecurity currentUser = Security.getCurrentUser();
         UUID userId = currentUser.id();
 
-        PaginationUtils.CursorPage page = PaginationUtils.resolveCursorPage(request);
-        String normalizedSearch = Normalize.normalizeTextPattern(search);
+        PaginationUtils.OffsetPage page = PaginationUtils.resolveOffsetPage(request);
+        String usernameSearch = Normalize.normalizeUsernamePattern(search);
+        String normalizedNameSearch = Normalize.normalizeTextPattern(search);
 
-        List<FriendEntity> fetchedFriendships = page.cursor() == null
-                ? friendRepository.findFriendshipsOfUser(userId, normalizedSearch, page.pageRequest())
-                : friendRepository.findFriendshipsOfUserBeforeCursor(
-                        userId, page.cursor(), normalizedSearch, page.pageRequest());
+        List<FriendEntity> fetchedFriendships = friendRepository.findFriendshipsOfUser(
+                userId, usernameSearch, normalizedNameSearch, page.pageRequest());
 
-        PaginationResponse<FriendDto> result = PaginationUtils.toCursorResponse(
-                fetchedFriendships,
-                page,
-                friendship -> new FriendDto(
-                        getFriendUser(friendship, userId).getId(),
-                        getFriendUser(friendship, userId).getUsername(),
-                        getFriendUser(friendship, userId).getFirstName(),
-                        getFriendUser(friendship, userId).getLastName(),
-                        getFriendUser(friendship, userId).getAvatarUrl(),
-                        getFriendUser(friendship, userId).getCreatedAt()),
-                FriendEntity::getCreatedAt,
-                false);
-
-        return new BaseResponse<>(result, "Success.", HttpStatus.OK.value());
-    }
-
-    @Override
-    public BaseResponse<List<FriendSearchDto>> searchByUsername(String username) {
-        UserSecurity currentUser = Security.getCurrentUser();
-        String searchPattern = Normalize.normalizeTextPattern(username);
-        if (searchPattern == null) return new BaseResponse<>(List.of(), "Success.", HttpStatus.OK.value());
-
-        List<UserEntity> users =
-                userRepository.searchUsersByUsername(searchPattern, PageRequest.of(0, USERNAME_SEARCH_LIMIT));
-        if (users.isEmpty()) return new BaseResponse<>(List.of(), "Success.", HttpStatus.OK.value());
-
-        List<UUID> userIds = users.stream().map(UserEntity::getId).toList();
-        Map<UUID, FriendEntity> friendshipsByUserId =
-                friendRepository.findFriendshipsBetweenUserAndUsers(currentUser.id(), userIds).stream()
-                        .collect(Collectors.toMap(
-                                friendship -> getFriendUser(friendship, currentUser.id())
-                                        .getId(),
-                                Function.identity()));
-        Map<UUID, FriendRequestEntity> pendingRequestsByUserId =
-                friendRequestRepository
-                        .findFriendRequestsBetweenUserAndUsers(currentUser.id(), userIds, FriendRequestStatus.PENDING)
-                        .stream()
-                        .collect(Collectors.toMap(
-                                request -> request.getFromUser().getId().equals(currentUser.id())
-                                        ? request.getToUser().getId()
-                                        : request.getFromUser().getId(),
-                                Function.identity()));
-
-        List<FriendSearchDto> result = users.stream()
-                .map(user -> {
-                    boolean isFriend = friendshipsByUserId.containsKey(user.getId());
-                    FriendRequestEntity pendingRequest = pendingRequestsByUserId.get(user.getId());
-                    FriendSearchStatus status = resolveSearchStatus(user, currentUser.id(), isFriend, pendingRequest);
-                    return new FriendSearchDto(
-                            user.getId(),
-                            user.getUsername(),
-                            user.getFirstName(),
-                            user.getLastName(),
-                            user.getAvatarUrl(),
-                            user.getCreatedAt(),
-                            status,
-                            pendingRequest == null ? null : pendingRequest.getId());
-                })
-                .toList();
+        PaginationResponse<FriendDto> result = PaginationUtils.toOffsetResponse(
+                fetchedFriendships, page, friendship -> friendMapper.toFriendDto(getFriendUser(friendship, userId)));
 
         return new BaseResponse<>(result, "Success.", HttpStatus.OK.value());
     }
@@ -143,31 +79,9 @@ public class FriendServiceImpl implements FriendService {
                 friendRequestRepository.findFriendRequestsReceivedOfUser(userId, FriendRequestStatus.PENDING);
 
         FriendRequestResponse result = new FriendRequestResponse(
-                sentRequests.stream()
-                        .map(f -> new FriendRequestSentDto(
-                                f.getId(),
-                                f.getFromUser().getId(),
-                                new AcceptFriendResponse(
-                                        f.getToUser().getId(),
-                                        f.getToUser().getFirstName(),
-                                        f.getToUser().getLastName(),
-                                        f.getToUser().getAvatarUrl()),
-                                f.getMessage(),
-                                f.getCreatedAt(),
-                                f.getUpdatedAt()))
-                        .toList(),
+                sentRequests.stream().map(friendRequestMapper::toSentDto).toList(),
                 receivedRequests.stream()
-                        .map(f -> new FriendRequestReceviedDto(
-                                f.getId(),
-                                f.getToUser().getId(),
-                                new AcceptFriendResponse(
-                                        f.getFromUser().getId(),
-                                        f.getFromUser().getFirstName(),
-                                        f.getFromUser().getLastName(),
-                                        f.getFromUser().getAvatarUrl()),
-                                f.getMessage(),
-                                f.getCreatedAt(),
-                                f.getUpdatedAt()))
+                        .map(friendRequestMapper::toReceivedDto)
                         .toList());
 
         return new BaseResponse<>(result, "Success.", HttpStatus.OK.value());
@@ -235,8 +149,7 @@ public class FriendServiceImpl implements FriendService {
                 .findById(friendRequest.getFromUser().getId())
                 .orElseThrow(() -> new NotFoundException("User not found."));
 
-        AcceptFriendResponse response =
-                new AcceptFriendResponse(user.getId(), user.getFirstName(), user.getLastName(), user.getAvatarUrl());
+        AcceptFriendResponse response = friendMapper.toAcceptFriendResponse(user);
 
         return new BaseResponse<>(response, "Friend request accepted successfully.", HttpStatus.CREATED.value());
     }
@@ -301,16 +214,5 @@ public class FriendServiceImpl implements FriendService {
 
     private UserEntity getFriendUser(FriendEntity friendship, UUID currentUserId) {
         return friendship.getUserA().getId().equals(currentUserId) ? friendship.getUserB() : friendship.getUserA();
-    }
-
-    private FriendSearchStatus resolveSearchStatus(
-            UserEntity user, UUID currentUserId, boolean isFriend, FriendRequestEntity pendingRequest) {
-        if (user.getId().equals(currentUserId)) return FriendSearchStatus.SELF;
-        if (isFriend) return FriendSearchStatus.FRIEND;
-        if (pendingRequest == null) return FriendSearchStatus.NONE;
-
-        return pendingRequest.getFromUser().getId().equals(currentUserId)
-                ? FriendSearchStatus.SENT
-                : FriendSearchStatus.RECEIVED;
     }
 }

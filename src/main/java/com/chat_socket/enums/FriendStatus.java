@@ -1,6 +1,6 @@
 package com.chat_socket.enums;
 
-public enum FriendSearchStatus {
+public enum FriendStatus {
     NONE,
     SELF,
     FRIEND,

@@ -23,8 +23,12 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
     @Query("""
             SELECT u
             FROM UserEntity u
-            WHERE LOWER(u.username) LIKE :username
-            ORDER BY u.username ASC
+            WHERE LOWER(u.username) LIKE :usernameSearch ESCAPE '\\'
+                OR u.normalizedName LIKE :normalizedNameSearch ESCAPE '\\'
+            ORDER BY u.username ASC, u.id ASC
             """)
-    List<UserEntity> searchUsersByUsername(@Param("username") String username, Pageable pageable);
+    List<UserEntity> searchUsers(
+            @Param("usernameSearch") String usernameSearch,
+            @Param("normalizedNameSearch") String normalizedNameSearch,
+            Pageable pageable);
 }

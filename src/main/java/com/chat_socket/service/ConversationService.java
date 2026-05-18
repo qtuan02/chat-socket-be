@@ -21,6 +21,8 @@ public interface ConversationService {
 
     BaseResponse<Void> markAsSeen(UUID conversationId);
 
+    BaseResponse<Void> deleteGroup(UUID conversationId);
+
     BaseResponse<ConversationDto> updateGroup(UUID conversationId, UpdateGroupRequest request);
 
     BaseResponse<ConversationDto> addGroupMembers(UUID conversationId, GroupMembersRequest request);

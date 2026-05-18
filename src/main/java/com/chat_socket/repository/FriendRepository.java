@@ -50,20 +50,29 @@ public interface FriendRepository extends JpaRepository<FriendEntity, UUID> {
             JOIN FETCH f.userB userB
             WHERE (userA.id = :userId OR userB.id = :userId)
                 AND (
-                    :search IS NULL
+                    :usernameSearch IS NULL
                     OR (
                         userA.id = :userId
-                        AND (LOWER(userB.username) LIKE :search OR userB.normalizedName LIKE :search)
+                        AND (
+                            LOWER(userB.username) LIKE :usernameSearch ESCAPE '\\'
+                            OR userB.normalizedName LIKE :normalizedNameSearch ESCAPE '\\'
+                        )
                     )
                     OR (
                         userB.id = :userId
-                        AND (LOWER(userA.username) LIKE :search OR userA.normalizedName LIKE :search)
+                        AND (
+                            LOWER(userA.username) LIKE :usernameSearch ESCAPE '\\'
+                            OR userA.normalizedName LIKE :normalizedNameSearch ESCAPE '\\'
+                        )
                     )
                 )
             ORDER BY f.createdAt DESC, f.id DESC
             """)
     List<FriendEntity> findFriendshipsOfUser(
-            @Param("userId") UUID userId, @Param("search") String search, Pageable pageable);
+            @Param("userId") UUID userId,
+            @Param("usernameSearch") String usernameSearch,
+            @Param("normalizedNameSearch") String normalizedNameSearch,
+            Pageable pageable);
 
     @Query("""
             SELECT f
@@ -73,14 +82,20 @@ public interface FriendRepository extends JpaRepository<FriendEntity, UUID> {
             WHERE (userA.id = :userId OR userB.id = :userId)
                 AND f.createdAt < :cursor
                 AND (
-                    :search IS NULL
+                    :usernameSearch IS NULL
                     OR (
                         userA.id = :userId
-                        AND (LOWER(userB.username) LIKE :search OR userB.normalizedName LIKE :search)
+                        AND (
+                            LOWER(userB.username) LIKE :usernameSearch ESCAPE '\\'
+                            OR userB.normalizedName LIKE :normalizedNameSearch ESCAPE '\\'
+                        )
                     )
                     OR (
                         userB.id = :userId
-                        AND (LOWER(userA.username) LIKE :search OR userA.normalizedName LIKE :search)
+                        AND (
+                            LOWER(userA.username) LIKE :usernameSearch ESCAPE '\\'
+                            OR userA.normalizedName LIKE :normalizedNameSearch ESCAPE '\\'
+                        )
                     )
                 )
             ORDER BY f.createdAt DESC, f.id DESC
@@ -88,6 +103,7 @@ public interface FriendRepository extends JpaRepository<FriendEntity, UUID> {
     List<FriendEntity> findFriendshipsOfUserBeforeCursor(
             @Param("userId") UUID userId,
             @Param("cursor") LocalDateTime cursor,
-            @Param("search") String search,
+            @Param("usernameSearch") String usernameSearch,
+            @Param("normalizedNameSearch") String normalizedNameSearch,
             Pageable pageable);
 }

@@ -1,8 +1,9 @@
 package com.chat_socket.security;
 
+import com.chat_socket.dto.ConversationRequest;
 import com.chat_socket.dto.UserPair;
 import com.chat_socket.dto.UserSecurity;
-import com.chat_socket.exception.ForbiddenException;
+import com.chat_socket.enums.ConversationType;
 import com.chat_socket.exception.FriendPermissionException;
 import com.chat_socket.repository.FriendRepository;
 import com.chat_socket.utils.Normalize;
@@ -21,12 +22,13 @@ public class MessageDirectPermission {
     }
 
     public boolean canSendDirect(UUID recipientId) {
-        if (recipientId == null) return true;
-
-        UserSecurity currentUser = Security.getCurrentUser();
-        if (!isFriend(currentUser.id(), recipientId)) throw new ForbiddenException("You are not friend with this user");
-
         return true;
+    }
+
+    public boolean canCreateConversation(ConversationRequest request) {
+        if (request == null || request.type() == ConversationType.DIRECT) return true;
+
+        return canSendDirect(request.memberIds());
     }
 
     public boolean canSendDirect(List<UUID> memberIds) {
@@ -36,7 +38,7 @@ public class MessageDirectPermission {
         List<UUID> notFriends = new ArrayList<>();
 
         for (UUID memberId : memberIds) {
-            if (memberId == null || !isFriend(currentUser.id(), memberId)) notFriends.add(memberId);
+            if (memberId == null || !hasFriendship(currentUser.id(), memberId)) notFriends.add(memberId);
         }
 
         if (!notFriends.isEmpty())
@@ -45,7 +47,7 @@ public class MessageDirectPermission {
         return true;
     }
 
-    private boolean isFriend(UUID currentUserId, UUID memberId) {
+    private boolean hasFriendship(UUID currentUserId, UUID memberId) {
         UserPair pair = Normalize.normalizeUserPair(currentUserId, memberId);
         return friendRepository.existsByUserAIdAndUserBId(pair.userAId(), pair.userBId());
     }

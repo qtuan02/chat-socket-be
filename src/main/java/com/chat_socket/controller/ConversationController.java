@@ -43,10 +43,18 @@ public class ConversationController {
     }
 
     @PostMapping()
-    @PreAuthorize("@messageDirectPermission.canSendDirect(#request.memberIds())")
+    @PreAuthorize("@messageDirectPermission.canCreateConversation(#request)")
     public ResponseEntity<BaseResponse<ConversationDto>> createConversation(
             @Valid @RequestBody ConversationRequest request) {
         BaseResponse<ConversationDto> body = conversationService.createConversation(request);
+        return ResponseEntity.status(body.status()).body(body);
+    }
+
+    @PatchMapping("/{conversationId}/group")
+    @PreAuthorize("@groupPermission.canManageGroup(#conversationId)")
+    public ResponseEntity<BaseResponse<ConversationDto>> updateGroup(
+            @PathVariable UUID conversationId, @Valid @RequestBody UpdateGroupRequest request) {
+        BaseResponse<ConversationDto> body = conversationService.updateGroup(conversationId, request);
         return ResponseEntity.status(body.status()).body(body);
     }
 
@@ -63,10 +71,10 @@ public class ConversationController {
         return ResponseEntity.status(body.status()).body(body);
     }
 
-    @PatchMapping("/{conversationId}/group")
-    public ResponseEntity<BaseResponse<ConversationDto>> updateGroup(
-            @PathVariable UUID conversationId, @Valid @RequestBody UpdateGroupRequest request) {
-        BaseResponse<ConversationDto> body = conversationService.updateGroup(conversationId, request);
+    @DeleteMapping("/{conversationId}/group")
+    @PreAuthorize("@groupPermission.canManageGroup(#conversationId)")
+    public ResponseEntity<BaseResponse<Void>> deleteGroup(@PathVariable UUID conversationId) {
+        BaseResponse<Void> body = conversationService.deleteGroup(conversationId);
         return ResponseEntity.status(body.status()).body(body);
     }
 

@@ -1,5 +1,6 @@
 package com.chat_socket.dto;
 
+import com.chat_socket.enums.FriendStatus;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -12,4 +13,5 @@ public record UserInfoDto(
         String avatarUrl,
         String bio,
         String phone,
-        LocalDateTime joinedAt) {}
+        LocalDateTime joinedAt,
+        FriendStatus statusFriend) {}
