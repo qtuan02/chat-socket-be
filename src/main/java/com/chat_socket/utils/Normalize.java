@@ -36,10 +36,23 @@ public class Normalize {
         String normalized = normalizeSearchText(value);
         if (normalized.isBlank()) return null;
 
-        return "%" + normalized + "%";
+        return "%" + escapeLikePattern(normalized) + "%";
+    }
+
+    public static String normalizeUsernamePattern(String value) {
+        if (value == null || value.isBlank()) return null;
+
+        String normalized = value.trim().toLowerCase(Locale.ROOT);
+        if (normalized.isBlank()) return null;
+
+        return "%" + escapeLikePattern(normalized) + "%";
     }
 
     private static String valueOrBlank(String value) {
         return value == null ? "" : value.trim();
+    }
+
+    private static String escapeLikePattern(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }

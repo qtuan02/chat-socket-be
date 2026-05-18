@@ -5,17 +5,13 @@ import com.chat_socket.dto.BaseResponse;
 import com.chat_socket.dto.FriendActionRequest;
 import com.chat_socket.dto.FriendDto;
 import com.chat_socket.dto.FriendRequestResponse;
-import com.chat_socket.dto.FriendSearchDto;
 import com.chat_socket.dto.FriendSendRequest;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
-import java.util.List;
 import java.util.UUID;
 
 public interface FriendService {
     BaseResponse<PaginationResponse<FriendDto>> getListFriend(PaginationRequest request, String search);
-
-    BaseResponse<List<FriendSearchDto>> searchByUsername(String username);
 
     BaseResponse<FriendRequestResponse> getListFriendRequest();
 

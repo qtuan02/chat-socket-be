@@ -110,6 +110,8 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private MessageEntity createMessage(ConversationEntity conversation, UserEntity sender, MessageRequest request) {
+        participantRepository.restoreDeletedParticipantsByConversationId(conversation.getId());
+
         MessageEntity message = new MessageEntity();
         message.setConversation(conversation);
         message.setSender(sender);

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -46,6 +47,27 @@ public interface ParticipantRepository extends JpaRepository<ParticipantEntity, 
             """)
     List<ParticipantEntity> findByConversationIdAndIdUserIdIn(
             @Param("conversationId") UUID conversationId, @Param("userIds") Collection<UUID> userIds);
+
+    @Modifying
+    @Query("""
+            UPDATE ParticipantEntity p
+            SET p.deletedAt = NULL
+            WHERE p.conversation.id = :conversationId
+                AND p.id.userId = :userId
+                AND p.leftAt IS NULL
+                AND p.deletedAt IS NOT NULL
+            """)
+    int restoreDeletedParticipant(@Param("conversationId") UUID conversationId, @Param("userId") UUID userId);
+
+    @Modifying
+    @Query("""
+            UPDATE ParticipantEntity p
+            SET p.deletedAt = NULL
+            WHERE p.conversation.id = :conversationId
+                AND p.leftAt IS NULL
+                AND p.deletedAt IS NOT NULL
+            """)
+    int restoreDeletedParticipantsByConversationId(@Param("conversationId") UUID conversationId);
 
     @Query("""
             SELECT COUNT(p)

@@ -6,13 +6,11 @@ import com.chat_socket.dto.BaseResponse;
 import com.chat_socket.dto.FriendActionRequest;
 import com.chat_socket.dto.FriendDto;
 import com.chat_socket.dto.FriendRequestResponse;
-import com.chat_socket.dto.FriendSearchDto;
 import com.chat_socket.dto.FriendSendRequest;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.service.FriendService;
 import jakarta.validation.Valid;
-import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -39,13 +37,6 @@ public class FriendController {
     public ResponseEntity<BaseResponse<PaginationResponse<FriendDto>>> getListFriend(
             @ModelAttribute PaginationRequest request, @RequestParam(required = false) String search) {
         BaseResponse<PaginationResponse<FriendDto>> body = friendService.getListFriend(request, search);
-        return ResponseEntity.status(body.status()).body(body);
-    }
-
-    @GetMapping("/search")
-    public ResponseEntity<BaseResponse<List<FriendSearchDto>>> searchByUsername(
-            @RequestParam(required = false) String username) {
-        BaseResponse<List<FriendSearchDto>> body = friendService.searchByUsername(username);
         return ResponseEntity.status(body.status()).body(body);
     }
 
