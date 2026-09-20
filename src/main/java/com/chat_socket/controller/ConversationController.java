@@ -50,6 +50,12 @@ public class ConversationController {
         return ResponseEntity.status(body.status()).body(body);
     }
 
+    @GetMapping("/{conversationId}")
+    public ResponseEntity<BaseResponse<ConversationDto>> getConversation(@PathVariable UUID conversationId) {
+        BaseResponse<ConversationDto> body = conversationService.getConversation(conversationId);
+        return ResponseEntity.status(body.status()).body(body);
+    }
+
     @PatchMapping("/{conversationId}")
     @PreAuthorize("@groupPermission.canManageGroup(#conversationId)")
     public ResponseEntity<BaseResponse<ConversationDto>> updateGroup(

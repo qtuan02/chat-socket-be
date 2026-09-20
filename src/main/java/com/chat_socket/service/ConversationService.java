@@ -16,6 +16,8 @@ public interface ConversationService {
     BaseResponse<PaginationResponse<ConversationDto>> getConversations(
             PaginationRequest request, ConversationType type);
 
+    BaseResponse<ConversationDto> getConversation(UUID conversationId);
+
     BaseResponse<ConversationDto> createConversation(ConversationRequest request);
 
     /** Existing DIRECT conversation between the two users, or a new one with both as participants. */

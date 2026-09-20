@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.chat_socket.config.GlobalExceptionHandler;
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.ConversationDto;
 import com.chat_socket.dto.ConversationRequest;
 import com.chat_socket.dto.GroupMembersRequest;
 import com.chat_socket.dto.PaginationRequest;
@@ -67,6 +68,18 @@ class ConversationControllerTest {
                         .param("type", "GROUP"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.items").isEmpty());
+    }
+
+    @Test
+    void getConversation_returnsDto() throws Exception {
+        when(conversationService.getConversation(C))
+                .thenReturn(new BaseResponse<>(
+                        new ConversationDto(C, ConversationType.GROUP, "Team", null, null, 2, List.of()), "ok", 200));
+
+        mockMvc.perform(get("/v1/conversation/{id}", C))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.groupName").value("Team"))
+                .andExpect(jsonPath("$.data.unreadCount").value(2));
     }
 
     @Test

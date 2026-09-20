@@ -157,6 +157,36 @@ class ConversationServiceImplTest {
         assertThat(response.data().nextCursor()).isNull();
     }
 
+    // ---------- getConversation ----------
+
+    @Test
+    void getConversation_nonParticipant_throwsForbidden() {
+        when(conversationRepository.existsById(C)).thenReturn(true);
+        when(participantRepository.existsByIdConversationIdAndIdUserIdAndLeftAtIsNullAndDeletedAtIsNull(C, BIG))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> service.getConversation(C)).isInstanceOf(ForbiddenException.class);
+    }
+
+    @Test
+    void getConversation_returnsDtoWithOwnUnreadCount() {
+        ConversationEntity conversation = TestFixtures.conversation(C, ConversationType.GROUP);
+        MessageRepository.UnreadCountProjection three = mock(MessageRepository.UnreadCountProjection.class);
+        when(three.getUnreadCount()).thenReturn(3L);
+        when(conversationRepository.existsById(C)).thenReturn(true);
+        when(participantRepository.existsByIdConversationIdAndIdUserIdAndLeftAtIsNullAndDeletedAtIsNull(C, BIG))
+                .thenReturn(true);
+        when(conversationRepository.findWithDetails(C)).thenReturn(Optional.of(conversation));
+        when(messageRepository.countUnreadMessagesByConversation(BIG, List.of(C)))
+                .thenReturn(List.of(three));
+        when(conversationMapper.toDto(conversation, 3L)).thenReturn(DTO);
+
+        BaseResponse<ConversationDto> response = service.getConversation(C);
+
+        assertThat(response.status()).isEqualTo(200);
+        assertThat(response.data()).isSameAs(DTO);
+    }
+
     // ---------- createConversation ----------
 
     @Test

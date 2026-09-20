@@ -119,6 +119,24 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     @Override
+    public BaseResponse<ConversationDto> getConversation(UUID conversationId) {
+        UserSecurity currentUser = Security.getCurrentUser();
+        ensureCanReadConversation(conversationId, currentUser.id());
+
+        ConversationEntity conversation = findConversationWithDetails(conversationId);
+        long unreadCount =
+                messageRepository.countUnreadMessagesByConversation(currentUser.id(), List.of(conversationId)).stream()
+                        .findFirst()
+                        .map(MessageRepository.UnreadCountProjection::getUnreadCount)
+                        .orElse(0L);
+
+        return new BaseResponse<>(
+                conversationMapper.toDto(conversation, unreadCount),
+                "Conversation retrieved successfully.",
+                HttpStatus.OK.value());
+    }
+
+    @Override
     @Transactional
     public BaseResponse<ConversationDto> createConversation(ConversationRequest request) {
         UserSecurity currentUser = Security.getCurrentUser();
