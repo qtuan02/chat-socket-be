@@ -26,7 +26,8 @@ public interface UserMapper {
 
     @Mapping(target = "joinedAt", source = "user.createdAt")
     @Mapping(target = "statusFriend", source = "statusFriend")
-    UserInfoDto toUserInfoDto(UserEntity user, FriendStatus statusFriend);
+    @Mapping(target = "requestId", source = "requestId")
+    UserInfoDto toUserInfoDto(UserEntity user, FriendStatus statusFriend, UUID requestId);
 
     @Mapping(target = "joinedAt", source = "user.createdAt")
     @Mapping(target = "statusFriend", source = "statusFriend")

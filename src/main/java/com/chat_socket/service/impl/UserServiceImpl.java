@@ -90,7 +90,10 @@ public class UserServiceImpl implements UserService {
         FriendStatus status =
                 resolveFriendStatus(user, currentUser.id(), hasFriendship(currentUser.id(), userId), pendingRequest);
 
-        return new BaseResponse<>(userMapper.toUserInfoDto(user, status), "Success.", HttpStatus.OK.value());
+        return new BaseResponse<>(
+                userMapper.toUserInfoDto(user, status, pendingRequest == null ? null : pendingRequest.getId()),
+                "Success.",
+                HttpStatus.OK.value());
     }
 
     @Override

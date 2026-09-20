@@ -6,6 +6,7 @@ import java.util.UUID;
 
 public record ConversationParticipantDto(
         UUID userId,
+        String username,
         String firstName,
         String lastName,
         String avatarUrl,

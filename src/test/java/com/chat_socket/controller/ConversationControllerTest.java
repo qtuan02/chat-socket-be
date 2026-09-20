@@ -110,7 +110,7 @@ class ConversationControllerTest {
         when(conversationService.updateGroup(C, new UpdateGroupRequest("x")))
                 .thenThrow(new BadRequestException("Group name is required."));
 
-        mockMvc.perform(patch("/v1/conversation/{id}/group", C)
+        mockMvc.perform(patch("/v1/conversation/{id}", C)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"name\":\"x\"}"))
                 .andExpect(status().isBadRequest())
@@ -135,7 +135,7 @@ class ConversationControllerTest {
 
         mockMvc.perform(patch("/v1/conversation/{id}/seen", C))
                 .andExpect(jsonPath("$.message").value("seen"));
-        mockMvc.perform(delete("/v1/conversation/{id}/group", C))
+        mockMvc.perform(delete("/v1/conversation/{id}", C))
                 .andExpect(jsonPath("$.message").value("deleted"));
         mockMvc.perform(post("/v1/conversation/{id}/leave", C))
                 .andExpect(jsonPath("$.message").value("left"));

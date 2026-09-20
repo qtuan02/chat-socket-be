@@ -59,8 +59,7 @@ class ConversationServiceImplTest {
     private static final UUID BIG = UUID.fromString("00000000-0000-0000-0000-000000000002");
     private static final UUID THIRD = UUID.fromString("00000000-0000-0000-0000-000000000003");
     private static final UUID C = UUID.fromString("00000000-0000-0000-0000-00000000c001");
-    private static final ConversationDto DTO =
-            new ConversationDto(C, null, null, null, null, null, null, null, null, null, null, 0, List.of());
+    private static final ConversationDto DTO = new ConversationDto(C, null, null, null, null, 0, List.of());
 
     @Mock
     ConversationRepository conversationRepository;

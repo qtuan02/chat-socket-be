@@ -111,7 +111,7 @@ class UserControllerTest {
     void getInfo_passesUserIdParam() throws Exception {
         when(userService.getUserInfo(ID)).thenReturn(new BaseResponse<>(null, "Success.", 200));
 
-        mockMvc.perform(get("/v1/user/info").param("userId", ID.toString()))
+        mockMvc.perform(get("/v1/user/{userId}", ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Success."));
     }

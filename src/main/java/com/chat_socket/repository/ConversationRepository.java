@@ -66,9 +66,6 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
             LEFT JOIN FETCH participant.user
             LEFT JOIN FETCH c.lastMessage lastMessage
             LEFT JOIN FETCH lastMessage.sender
-            LEFT JOIN FETCH c.createdBy
-            LEFT JOIN FETCH c.directUserA
-            LEFT JOIN FETCH c.directUserB
             WHERE c.id IN :conversationIds
             """)
     List<ConversationEntity> findConversationsWithDetails(@Param("conversationIds") Collection<UUID> conversationIds);

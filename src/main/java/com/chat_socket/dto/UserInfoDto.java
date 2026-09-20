@@ -14,4 +14,5 @@ public record UserInfoDto(
         String bio,
         String phone,
         Instant joinedAt,
-        FriendStatus statusFriend) {}
+        FriendStatus statusFriend,
+        UUID requestId) {}

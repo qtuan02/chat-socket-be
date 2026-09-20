@@ -154,7 +154,7 @@ class UserServiceImplTest {
 
         service.getUserInfo(BIG);
 
-        verify(userMapper).toUserInfoDto(me, FriendStatus.SELF);
+        verify(userMapper).toUserInfoDto(eq(me), eq(FriendStatus.SELF), any());
     }
 
     @Test
@@ -169,7 +169,7 @@ class UserServiceImplTest {
 
         service.getUserInfo(SMALL);
 
-        verify(userMapper).toUserInfoDto(other, FriendStatus.FRIEND);
+        verify(userMapper).toUserInfoDto(eq(other), eq(FriendStatus.FRIEND), any());
     }
 
     @Test
@@ -186,7 +186,7 @@ class UserServiceImplTest {
 
         service.getUserInfo(SMALL);
 
-        verify(userMapper).toUserInfoDto(other, FriendStatus.SENT);
+        verify(userMapper).toUserInfoDto(eq(other), eq(FriendStatus.SENT), any());
     }
 
     @Test
@@ -203,7 +203,24 @@ class UserServiceImplTest {
 
         service.getUserInfo(SMALL);
 
-        verify(userMapper).toUserInfoDto(other, FriendStatus.RECEIVED);
+        verify(userMapper).toUserInfoDto(eq(other), eq(FriendStatus.RECEIVED), any());
+    }
+
+    @Test
+    void getUserInfo_pendingRequest_passesRequestIdToMapper() {
+        TestFixtures.authenticateAs(BIG);
+        UserEntity other = TestFixtures.user(SMALL);
+        FriendRequestEntity pending = TestFixtures.friendRequest(
+                UUID.randomUUID(), TestFixtures.user(BIG), other, FriendRequestStatus.PENDING);
+        when(userRepository.findById(SMALL)).thenReturn(Optional.of(other));
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(false);
+        when(friendRequestRepository.findFriendRequestsBetweenUserAndUsers(
+                        BIG, List.of(SMALL), FriendRequestStatus.PENDING))
+                .thenReturn(List.of(pending));
+
+        service.getUserInfo(SMALL);
+
+        verify(userMapper).toUserInfoDto(other, FriendStatus.SENT, pending.getId());
     }
 
     @Test
@@ -218,7 +235,7 @@ class UserServiceImplTest {
 
         service.getUserInfo(SMALL);
 
-        verify(userMapper).toUserInfoDto(other, FriendStatus.NONE);
+        verify(userMapper).toUserInfoDto(eq(other), eq(FriendStatus.NONE), any());
     }
 
     @Test
