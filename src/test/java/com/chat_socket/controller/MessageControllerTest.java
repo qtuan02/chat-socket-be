@@ -64,6 +64,15 @@ class MessageControllerTest {
     }
 
     @Test
+    void sendGroup_missingConversationId_returns400Validation() throws Exception {
+        mockMvc.perform(post("/v1/message/group")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"hi\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.conversationId").value("Conversation is required"));
+    }
+
+    @Test
     void sendGroup_forbiddenException_returns403() throws Exception {
         when(messageService.sendGroupMessage(new GroupMessageRequest(ID, "hi", null, null)))
                 .thenThrow(new ForbiddenException("You are not a participant of this conversation."));

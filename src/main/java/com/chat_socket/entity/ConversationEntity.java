@@ -25,6 +25,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Getter
@@ -67,7 +68,9 @@ public class ConversationEntity {
     @Column(name = "last_message_at")
     private Instant lastMessageAt;
 
+    /** Only active participants — a kicked/left member must not reappear in a loaded conversation's roster. */
     @OneToMany(mappedBy = "conversation")
+    @SQLRestriction("left_at IS NULL AND deleted_at IS NULL")
     private List<ParticipantEntity> participants = new ArrayList<>();
 
     @CreationTimestamp
