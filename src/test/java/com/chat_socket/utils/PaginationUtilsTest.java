@@ -75,7 +75,7 @@ class PaginationUtilsTest {
         PaginationResponse<String> response =
                 PaginationUtils.toCursorResponse(fetched, page, Instant::toString, Function.identity(), false);
 
-        assertThat(response.messages()).containsExactly("2026-01-03T00:00:00Z", "2026-01-02T00:00:00Z");
+        assertThat(response.items()).containsExactly("2026-01-03T00:00:00Z", "2026-01-02T00:00:00Z");
         assertThat(response.nextCursor()).isEqualTo("2026-01-02T00:00:00.000000Z");
         assertThat(response.nextOffset()).isNull();
     }
@@ -88,7 +88,7 @@ class PaginationUtilsTest {
         PaginationResponse<String> response =
                 PaginationUtils.toCursorResponse(fetched, page, Instant::toString, Function.identity(), true);
 
-        assertThat(response.messages()).containsExactly("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
+        assertThat(response.items()).containsExactly("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
         assertThat(response.nextCursor()).isNull();
     }
 
@@ -115,7 +115,7 @@ class PaginationUtilsTest {
 
         PaginationResponse<Integer> response = PaginationUtils.toOffsetResponse(List.of(1, 2, 3), page, i -> i * 10);
 
-        assertThat(response.messages()).containsExactly(10, 20);
+        assertThat(response.items()).containsExactly(10, 20);
         assertThat(response.nextOffset()).isEqualTo(6);
         assertThat(response.nextCursor()).isNull();
     }

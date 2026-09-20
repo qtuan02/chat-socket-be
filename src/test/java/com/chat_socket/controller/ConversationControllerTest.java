@@ -66,7 +66,7 @@ class ConversationControllerTest {
                         .param("cursor", "2026-01-01T00:00:00")
                         .param("type", "GROUP"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.messages").isEmpty());
+                .andExpect(jsonPath("$.data.items").isEmpty());
     }
 
     @Test

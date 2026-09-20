@@ -228,7 +228,7 @@ class UserServiceImplTest {
         BaseResponse<PaginationResponse<UserSearchDto>> response = service.searchUsers(null, "   ");
 
         assertThat(response.status()).isEqualTo(200);
-        assertThat(response.data().messages()).isEmpty();
+        assertThat(response.data().items()).isEmpty();
         assertThat(response.data().nextOffset()).isNull();
     }
 
@@ -254,7 +254,7 @@ class UserServiceImplTest {
                 service.searchUsers(new PaginationRequest(10, null, 0), "bob");
 
         assertThat(response.status()).isEqualTo(200);
-        assertThat(response.data().messages()).hasSize(2);
+        assertThat(response.data().items()).hasSize(2);
         verify(userMapper).toUserSearchDto(friend, FriendStatus.FRIEND, null);
         verify(userMapper).toUserSearchDto(stranger, FriendStatus.RECEIVED, pending.getId());
     }

@@ -104,7 +104,7 @@ class UserControllerTest {
                         .param("offset", "10")
                         .param("search", "bob"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.messages").isEmpty());
+                .andExpect(jsonPath("$.data.items").isEmpty());
     }
 
     @Test

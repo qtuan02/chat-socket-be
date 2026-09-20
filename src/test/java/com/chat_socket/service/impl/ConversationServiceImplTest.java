@@ -132,7 +132,7 @@ class ConversationServiceImplTest {
         BaseResponse<PaginationResponse<ConversationDto>> response = service.getConversations(null, null);
 
         assertThat(response.status()).isEqualTo(200);
-        assertThat(response.data().messages()).isEmpty();
+        assertThat(response.data().items()).isEmpty();
         assertThat(response.data().nextCursor()).isNull();
         verify(conversationRepository, never()).findConversationsWithDetails(any());
     }
@@ -154,7 +154,7 @@ class ConversationServiceImplTest {
         BaseResponse<PaginationResponse<ConversationDto>> response =
                 service.getConversations(null, ConversationType.GROUP);
 
-        assertThat(response.data().messages()).containsExactly(DTO);
+        assertThat(response.data().items()).containsExactly(DTO);
         assertThat(response.data().nextCursor()).isNull();
     }
 
@@ -345,7 +345,7 @@ class ConversationServiceImplTest {
 
         BaseResponse<PaginationResponse<MessageDto>> response = service.getMessages(C, null);
 
-        assertThat(response.data().messages()).containsExactly(olderDto, newerDto);
+        assertThat(response.data().items()).containsExactly(olderDto, newerDto);
         assertThat(response.data().nextCursor()).isNull();
     }
 

@@ -91,7 +91,7 @@ class FriendServiceImplTest {
         BaseResponse<PaginationResponse<FriendDto>> response = service.getListFriend(null, null);
 
         assertThat(response.status()).isEqualTo(200);
-        assertThat(response.data().messages()).containsExactly(dto);
+        assertThat(response.data().items()).containsExactly(dto);
         assertThat(response.data().nextOffset()).isNull();
     }
 
