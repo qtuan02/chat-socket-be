@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.chat_socket.TestFixtures;
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.ChangePasswordRequest;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.dto.UpdateUserRequest;
@@ -35,6 +37,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceImplTest {
@@ -55,11 +58,15 @@ class UserServiceImplTest {
     @Mock
     UserMapper userMapper;
 
+    @Mock
+    PasswordEncoder passwordEncoder;
+
     UserServiceImpl service;
 
     @BeforeEach
     void setUp() {
-        service = new UserServiceImpl(userRepository, friendRepository, friendRequestRepository, userMapper);
+        service = new UserServiceImpl(
+                userRepository, friendRepository, friendRequestRepository, userMapper, passwordEncoder);
     }
 
     @AfterEach
@@ -87,6 +94,46 @@ class UserServiceImplTest {
 
         assertThat(response.status()).isEqualTo(200);
         assertThat(response.data()).isEqualTo(dto);
+    }
+
+    @Test
+    void changePassword_wrongCurrent_throwsBadRequest() {
+        TestFixtures.authenticateAs(BIG);
+        UserEntity me = TestFixtures.user(BIG);
+        when(userRepository.findById(BIG)).thenReturn(Optional.of(me));
+        when(passwordEncoder.matches("old", "hashed")).thenReturn(false);
+
+        assertThatThrownBy(() -> service.changePassword(new ChangePasswordRequest("old", "newpassword")))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Current password is incorrect.");
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void changePassword_sameAsCurrent_throwsBadRequest() {
+        TestFixtures.authenticateAs(BIG);
+        UserEntity me = TestFixtures.user(BIG);
+        when(userRepository.findById(BIG)).thenReturn(Optional.of(me));
+        when(passwordEncoder.matches("samepass", "hashed")).thenReturn(true);
+
+        assertThatThrownBy(() -> service.changePassword(new ChangePasswordRequest("samepass", "samepass")))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("New password must differ from current password.");
+    }
+
+    @Test
+    void changePassword_success_storesEncodedAndReturns204() {
+        TestFixtures.authenticateAs(BIG);
+        UserEntity me = TestFixtures.user(BIG);
+        when(userRepository.findById(BIG)).thenReturn(Optional.of(me));
+        when(passwordEncoder.matches("old", "hashed")).thenReturn(true);
+        when(passwordEncoder.encode("newpassword")).thenReturn("hashed-new");
+
+        BaseResponse<Void> response = service.changePassword(new ChangePasswordRequest("old", "newpassword"));
+
+        assertThat(response.status()).isEqualTo(204);
+        assertThat(me.getHashedPassword()).isEqualTo("hashed-new");
+        verify(userRepository).save(me);
     }
 
     @Test

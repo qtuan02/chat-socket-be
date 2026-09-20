@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.chat_socket.config.GlobalExceptionHandler;
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.ChangePasswordRequest;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.dto.UpdateUserRequest;
@@ -114,5 +115,25 @@ class UserControllerTest {
         mockMvc.perform(get("/v1/user/{userId}", ID))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Success."));
+    }
+
+    @Test
+    void changePassword_shortNewPassword_returns400() throws Exception {
+        mockMvc.perform(patch("/v1/user/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"old\",\"newPassword\":\"short\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.newPassword").exists());
+    }
+
+    @Test
+    void changePassword_valid_returns204() throws Exception {
+        when(userService.changePassword(new ChangePasswordRequest("old", "newpassword")))
+                .thenReturn(new BaseResponse<>(null, null, 204));
+
+        mockMvc.perform(patch("/v1/user/me/password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"old\",\"newPassword\":\"newpassword\"}"))
+                .andExpect(status().isNoContent());
     }
 }

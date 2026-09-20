@@ -2,6 +2,7 @@ package com.chat_socket.controller;
 
 import com.chat_socket.constant.RouteApi;
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.ChangePasswordRequest;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.dto.UpdateUserRequest;
@@ -52,6 +53,12 @@ public class UserController {
     @GetMapping("/{userId}")
     public ResponseEntity<BaseResponse<UserInfoDto>> getInfo(@PathVariable UUID userId) {
         BaseResponse<UserInfoDto> body = userService.getUserInfo(userId);
+        return ResponseEntity.status(body.status()).body(body);
+    }
+
+    @PatchMapping("/me/password")
+    public ResponseEntity<BaseResponse<Void>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        BaseResponse<Void> body = userService.changePassword(request);
         return ResponseEntity.status(body.status()).body(body);
     }
 }

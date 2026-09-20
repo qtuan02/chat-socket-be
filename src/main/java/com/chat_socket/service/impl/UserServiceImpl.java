@@ -1,6 +1,7 @@
 package com.chat_socket.service.impl;
 
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.ChangePasswordRequest;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.dto.UpdateUserRequest;
@@ -30,6 +31,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,16 +41,19 @@ public class UserServiceImpl implements UserService {
     private final FriendRepository friendRepository;
     private final FriendRequestRepository friendRequestRepository;
     private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
 
     public UserServiceImpl(
             UserRepository userRepository,
             FriendRepository friendRepository,
             FriendRequestRepository friendRequestRepository,
-            UserMapper userMapper) {
+            UserMapper userMapper,
+            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.friendRepository = friendRepository;
         this.friendRequestRepository = friendRequestRepository;
         this.userMapper = userMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -80,6 +85,23 @@ public class UserServiceImpl implements UserService {
 
         UserProfileDto userProfile = userMapper.toUserProfileDto(userRepository.save(user));
         return new BaseResponse<>(userProfile, "User profile updated successfully.", HttpStatus.OK.value());
+    }
+
+    @Override
+    @Transactional
+    public BaseResponse<Void> changePassword(ChangePasswordRequest request) {
+        UserSecurity currentUser = Security.getCurrentUser();
+        UserEntity user =
+                userRepository.findById(currentUser.id()).orElseThrow(() -> new NotFoundException("User not found"));
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getHashedPassword()))
+            throw new BadRequestException("Current password is incorrect.");
+        if (request.currentPassword().equals(request.newPassword()))
+            throw new BadRequestException("New password must differ from current password.");
+
+        user.setHashedPassword(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+        return new BaseResponse<>(null, null, HttpStatus.NO_CONTENT.value());
     }
 
     @Override
