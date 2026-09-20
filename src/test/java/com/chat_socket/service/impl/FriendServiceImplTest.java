@@ -23,6 +23,7 @@ import com.chat_socket.entity.FriendEntity;
 import com.chat_socket.entity.FriendRequestEntity;
 import com.chat_socket.entity.UserEntity;
 import com.chat_socket.enums.FriendRequestStatus;
+import com.chat_socket.exception.BadRequestException;
 import com.chat_socket.exception.NotFoundException;
 import com.chat_socket.mapper.FriendMapper;
 import com.chat_socket.mapper.FriendRequestMapper;
@@ -118,13 +119,12 @@ class FriendServiceImplTest {
     }
 
     @Test
-    void sendFriendRequest_toSelf_returns400() {
+    void sendFriendRequest_toSelf_throwsBadRequest() {
         TestFixtures.authenticateAs(BIG);
 
-        BaseResponse<String> response = service.sendFriendRequest(new FriendSendRequest(BIG, null));
-
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.message()).isEqualTo("You cannot send a friend request to yourself.");
+        assertThatThrownBy(() -> service.sendFriendRequest(new FriendSendRequest(BIG, null)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("You cannot send a friend request to yourself.");
     }
 
     @Test

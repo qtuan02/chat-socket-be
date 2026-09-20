@@ -14,6 +14,7 @@ import com.chat_socket.entity.FriendEntity;
 import com.chat_socket.entity.FriendRequestEntity;
 import com.chat_socket.entity.UserEntity;
 import com.chat_socket.enums.FriendRequestStatus;
+import com.chat_socket.exception.BadRequestException;
 import com.chat_socket.exception.NotFoundException;
 import com.chat_socket.mapper.FriendMapper;
 import com.chat_socket.mapper.FriendRequestMapper;
@@ -94,9 +95,7 @@ public class FriendServiceImpl implements FriendService {
         UUID fromUserId = currentUser.id();
         UUID toUserId = request.toUserId();
 
-        if (fromUserId.equals(toUserId))
-            return new BaseResponse<>(
-                    null, "You cannot send a friend request to yourself.", HttpStatus.BAD_REQUEST.value());
+        if (fromUserId.equals(toUserId)) throw new BadRequestException("You cannot send a friend request to yourself.");
 
         UserEntity fromUser =
                 userRepository.findById(fromUserId).orElseThrow(() -> new NotFoundException("User not found."));

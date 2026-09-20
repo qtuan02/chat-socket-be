@@ -36,22 +36,18 @@ public final class PaginationUtils {
     }
 
     public static CursorPage resolveCursorPage(PaginationRequest request) {
-        CursorPage page;
-
         try {
             int limit = request == null || request.limit() == null ? DEFAULT_LIMIT : request.limit();
             if (limit < 1) throw new IllegalArgumentException("Limit must be greater than 0.");
 
             limit = Math.min(limit, MAX_LIMIT);
             LocalDateTime cursor = parseDateTimeCursor(request == null ? null : request.cursor());
-            page = new CursorPage(limit, cursor, PageRequest.of(0, limit + 1));
+            return new CursorPage(limit, cursor, PageRequest.of(0, limit + 1));
         } catch (IllegalArgumentException ex) {
             throw new BadRequestException(ex.getMessage());
         } catch (DateTimeParseException ex) {
             throw new BadRequestException("Cursor is invalid.");
         }
-
-        return page;
     }
 
     public static OffsetPage resolveOffsetPage(PaginationRequest request) {

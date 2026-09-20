@@ -27,6 +27,7 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.util.WebUtils;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -88,8 +89,8 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public BaseResponse<String> signOut(HttpServletRequest request, HttpServletResponse response) {
-        String refreshToken = getCookieValue(request, REFRESH_TOKEN_COOKIE_NAME)
-                .orElseThrow(() -> new UnAuthorizedException("Token not found."));
+        String refreshToken =
+                getRefreshTokenCookie(request).orElseThrow(() -> new UnAuthorizedException("Token not found."));
         sessionRepository.deleteByRefreshToken(refreshToken);
         clearRefreshTokenCookie(response);
 
@@ -98,8 +99,8 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public BaseResponse<AuthResponse> refresh(HttpServletRequest request, HttpServletResponse response) {
-        String refreshToken = getCookieValue(request, REFRESH_TOKEN_COOKIE_NAME)
-                .orElseThrow(() -> new UnAuthorizedException("Token not found."));
+        String refreshToken =
+                getRefreshTokenCookie(request).orElseThrow(() -> new UnAuthorizedException("Token not found."));
 
         SessionEntity session = sessionRepository
                 .findByRefreshToken(refreshToken)
@@ -118,35 +119,29 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private void addRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
-        ResponseCookie refreshTokenCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, refreshToken)
-                .httpOnly(true) // no access via javascript
-                .secure(true) // send https only
-                .sameSite("none") // allow cross-site
-                .maxAge(Duration.ofDays(config.refreshTokenTtl())) // 14 days
-                .build();
-
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
+        response.addHeader(
+                HttpHeaders.SET_COOKIE,
+                refreshTokenCookie(refreshToken, Duration.ofDays(config.refreshTokenTtl()))
+                        .toString());
     }
 
     private void clearRefreshTokenCookie(HttpServletResponse response) {
-        ResponseCookie refreshTokenCookie = ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, "")
-                .httpOnly(true) // no access via javascript
-                .secure(true) // send https only
-                .sameSite("none") // allow cross-site
-                .maxAge(Duration.ZERO)
-                .build();
-
-        response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
+        response.addHeader(
+                HttpHeaders.SET_COOKIE, refreshTokenCookie("", Duration.ZERO).toString());
     }
 
-    private Optional<String> getCookieValue(HttpServletRequest request, String cookieName) {
-        Cookie[] cookies = request.getCookies();
-        if (cookies == null) return Optional.empty();
+    /** HttpOnly + Secure + SameSite=None so the browser sends it cross-site over HTTPS only. */
+    private static ResponseCookie refreshTokenCookie(String value, Duration maxAge) {
+        return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, value)
+                .httpOnly(true)
+                .secure(true)
+                .sameSite("none")
+                .maxAge(maxAge)
+                .build();
+    }
 
-        for (Cookie cookie : cookies) {
-            if (cookieName.equals(cookie.getName())) return Optional.of(cookie.getValue());
-        }
-
-        return Optional.empty();
+    private static Optional<String> getRefreshTokenCookie(HttpServletRequest request) {
+        return Optional.ofNullable(WebUtils.getCookie(request, REFRESH_TOKEN_COOKIE_NAME))
+                .map(Cookie::getValue);
     }
 }
