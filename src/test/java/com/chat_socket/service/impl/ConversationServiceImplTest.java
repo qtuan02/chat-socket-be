@@ -115,9 +115,9 @@ class ConversationServiceImplTest {
         return me;
     }
 
-    /** findConversationsWithDetails(List.of(C)) returns the given conversation and the mapper turns it into DTO. */
+    /** findWithDetails(C) returns the given conversation and the mapper turns it into DTO. */
     private void stubDetailsAndMapper(ConversationEntity conversation) {
-        when(conversationRepository.findConversationsWithDetails(List.of(C))).thenReturn(List.of(conversation));
+        when(conversationRepository.findWithDetails(C)).thenReturn(Optional.of(conversation));
         when(conversationMapper.toDto(conversation)).thenReturn(DTO);
     }
 
@@ -198,6 +198,7 @@ class ConversationServiceImplTest {
         assertThat(response.data()).isEqualTo(DTO);
         verify(participantRepository).restoreDeletedParticipant(C, BIG);
         verify(conversationRepository, never()).saveAndFlush(any());
+        verify(socketPublisher).publishConversationUpdatedAfterCommit(any(ConversationEntity.class));
     }
 
     @Test
@@ -215,8 +216,8 @@ class ConversationServiceImplTest {
         });
         when(participantRepository.save(any(ParticipantEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(conversationRepository.findConversationsWithDetails(List.of(C)))
-                .thenReturn(List.of(TestFixtures.conversation(C, ConversationType.DIRECT)));
+        when(conversationRepository.findWithDetails(C))
+                .thenReturn(Optional.of(TestFixtures.conversation(C, ConversationType.DIRECT)));
         when(conversationMapper.toDto(any(ConversationEntity.class))).thenReturn(DTO);
 
         BaseResponse<ConversationDto> response =
@@ -231,6 +232,7 @@ class ConversationServiceImplTest {
         assertThat(saved.getValue().getCreatedBy()).isSameAs(me);
         verify(participantRepository, times(2)).save(any(ParticipantEntity.class));
         verify(participantRepository).restoreDeletedParticipant(C, BIG);
+        verify(socketPublisher).publishConversationUpdatedAfterCommit(any(ConversationEntity.class));
     }
 
     @Test
@@ -282,6 +284,7 @@ class ConversationServiceImplTest {
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(BIG, ParticipantRole.ADMIN),
                         org.assertj.core.groups.Tuple.tuple(SMALL, ParticipantRole.MEMBER));
+        verify(socketPublisher).publishConversationUpdatedAfterCommit(any(ConversationEntity.class));
     }
 
     // ---------- findOrCreateDirectConversation ----------
@@ -395,8 +398,6 @@ class ConversationServiceImplTest {
         ParticipantEntity me = stubGroupWithMe(ParticipantRole.MEMBER);
         MessageEntity last = TestFixtures.message(UUID.randomUUID(), me.getConversation(), TestFixtures.user(SMALL));
         me.getConversation().setLastMessage(last);
-        MessageDto lastDto = new MessageDto(last.getId(), C, SMALL, "hello", null, MessageType.TEXT, null, null);
-        when(messageMapper.toDto(last)).thenReturn(lastDto);
 
         BaseResponse<Void> response = service.markAsSeen(C);
 
@@ -405,8 +406,7 @@ class ConversationServiceImplTest {
         assertThat(me.getLastReadAt()).isNotNull();
         verify(participantRepository).save(me);
         verify(socketPublisher)
-                .publishConversationSeenAfterCommit(
-                        eq(C), eq(BIG), eq(lastDto), eq(TestFixtures.FIXED_TIME), any(Instant.class));
+                .publishConversationSeenAfterCommit(eq(C), eq(BIG), eq(last.getId()), any(Instant.class));
     }
 
     // ---------- deleteGroup ----------
@@ -442,7 +442,7 @@ class ConversationServiceImplTest {
         assertThat(me.getDeletedAt()).isNotNull();
         assertThat(me.getLastReadMessage()).isSameAs(last);
         verify(participantRepository).save(me);
-        verify(socketPublisher).publishGroupDeletedAfterCommit(C, BIG);
+        verify(socketPublisher).publishConversationRemovedAfterCommit(C, List.of(BIG));
     }
 
     // ---------- updateGroup ----------
@@ -465,7 +465,7 @@ class ConversationServiceImplTest {
         assertThat(response.status()).isEqualTo(200);
         assertThat(conversation.getGroupName()).isEqualTo("New name");
         verify(conversationRepository).save(conversation);
-        verify(socketPublisher).publishConversationUpdatedAfterCommit(C, null, TestFixtures.FIXED_TIME);
+        verify(socketPublisher).publishConversationUpdatedAfterCommit(conversation);
     }
 
     // ---------- addGroupMembers ----------
@@ -529,7 +529,7 @@ class ConversationServiceImplTest {
         assertThat(saved.getValue().getUser()).isSameAs(other);
         assertThat(saved.getValue().getRole()).isEqualTo(ParticipantRole.MEMBER);
         verify(conversationRepository).save(me.getConversation());
-        verify(socketPublisher).publishConversationUpdatedAfterCommit(C, null, TestFixtures.FIXED_TIME);
+        verify(socketPublisher).publishConversationUpdatedAfterCommit(me.getConversation());
     }
 
     @Test
@@ -600,19 +600,21 @@ class ConversationServiceImplTest {
     }
 
     @Test
-    void removeGroupMember_success_marksTargetLeftAndPublishes() {
+    void removeGroupMember_publishesRemovedToTargetAndUpdatedToRest() {
         ParticipantEntity me = stubGroupWithMe(ParticipantRole.ADMIN);
+        ConversationEntity conversation = me.getConversation();
         ParticipantEntity target =
-                TestFixtures.participant(me.getConversation(), TestFixtures.user(SMALL), ParticipantRole.MEMBER);
+                TestFixtures.participant(conversation, TestFixtures.user(SMALL), ParticipantRole.MEMBER);
         when(participantRepository.findActiveParticipant(C, SMALL)).thenReturn(Optional.of(target));
-        stubDetailsAndMapper(me.getConversation());
+        stubDetailsAndMapper(conversation);
 
         BaseResponse<ConversationDto> response = service.removeGroupMember(C, SMALL);
 
         assertThat(response.status()).isEqualTo(200);
         assertThat(target.getLeftAt()).isNotNull();
         verify(participantRepository).save(target);
-        verify(socketPublisher).publishConversationUpdatedAfterCommit(C, null, TestFixtures.FIXED_TIME);
+        verify(socketPublisher).publishConversationRemovedAfterCommit(C, List.of(SMALL));
+        verify(socketPublisher).publishConversationUpdatedAfterCommit(conversation);
     }
 
     // ---------- leaveGroup ----------
@@ -630,12 +632,15 @@ class ConversationServiceImplTest {
     @Test
     void leaveGroup_member_marksLeftAndPublishes() {
         ParticipantEntity me = stubGroupWithMe(ParticipantRole.MEMBER);
+        ConversationEntity conversation = me.getConversation();
+        when(conversationRepository.findWithDetails(C)).thenReturn(Optional.of(conversation));
 
         BaseResponse<Void> response = service.leaveGroup(C);
 
         assertThat(response.status()).isEqualTo(200);
         assertThat(me.getLeftAt()).isNotNull();
         verify(participantRepository).save(me);
-        verify(socketPublisher).publishConversationUpdatedAfterCommit(C, null, TestFixtures.FIXED_TIME);
+        verify(socketPublisher).publishConversationRemovedAfterCommit(C, List.of(BIG));
+        verify(socketPublisher).publishConversationUpdatedAfterCommit(conversation);
     }
 }

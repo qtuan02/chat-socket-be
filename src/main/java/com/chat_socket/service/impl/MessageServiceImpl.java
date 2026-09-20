@@ -71,7 +71,7 @@ public class MessageServiceImpl implements MessageService {
                 createMessage(conversation, sender, request.content(), request.type(), request.attachmentUrl());
         MessageDto messageDto = messageMapper.toDto(message);
 
-        socketPublisher.publishMessageAfterCommit(conversation.getId(), messageDto, conversation.getLastMessageAt());
+        publishMessageCreated(conversation, messageDto);
 
         return new BaseResponse<>(messageDto, "Message sent successfully.", HttpStatus.CREATED.value());
     }
@@ -89,9 +89,16 @@ public class MessageServiceImpl implements MessageService {
                 createMessage(conversation, sender, request.content(), request.type(), request.attachmentUrl());
         MessageDto messageDto = messageMapper.toDto(message);
 
-        socketPublisher.publishMessageAfterCommit(conversation.getId(), messageDto, conversation.getLastMessageAt());
+        publishMessageCreated(conversation, messageDto);
 
         return new BaseResponse<>(messageDto, "Message sent successfully.", HttpStatus.CREATED.value());
+    }
+
+    private void publishMessageCreated(ConversationEntity conversation, MessageDto messageDto) {
+        ConversationEntity updatedConversation = conversationRepository
+                .findWithDetails(conversation.getId())
+                .orElseThrow(() -> new NotFoundException("Conversation not found."));
+        socketPublisher.publishMessageCreatedAfterCommit(updatedConversation, messageDto);
     }
 
     private static void validateContent(String content, MessageType type, String attachmentUrl) {

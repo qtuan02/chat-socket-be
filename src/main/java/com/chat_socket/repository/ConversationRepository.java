@@ -69,4 +69,8 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
             WHERE c.id IN :conversationIds
             """)
     List<ConversationEntity> findConversationsWithDetails(@Param("conversationIds") Collection<UUID> conversationIds);
+
+    default Optional<ConversationEntity> findWithDetails(UUID conversationId) {
+        return findConversationsWithDetails(List.of(conversationId)).stream().findFirst();
+    }
 }

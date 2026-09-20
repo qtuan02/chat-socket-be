@@ -186,11 +186,7 @@ public class ConversationServiceImpl implements ConversationService {
         participantRepository.save(participant);
 
         socketPublisher.publishConversationSeenAfterCommit(
-                conversationId,
-                currentUser.id(),
-                messageMapper.toDto(lastMessage),
-                conversation.getLastMessageAt(),
-                seenAt);
+                conversationId, currentUser.id(), lastMessage.getId(), seenAt);
 
         return new BaseResponse<>(null, "Messages marked as seen successfully.", HttpStatus.OK.value());
     }
@@ -211,7 +207,7 @@ public class ConversationServiceImpl implements ConversationService {
         }
         participantRepository.save(participant);
 
-        socketPublisher.publishGroupDeletedAfterCommit(conversationId, currentUser.id());
+        socketPublisher.publishConversationRemovedAfterCommit(conversationId, List.of(currentUser.id()));
 
         return new BaseResponse<>(null, "Group deleted successfully.", HttpStatus.OK.value());
     }
@@ -230,7 +226,7 @@ public class ConversationServiceImpl implements ConversationService {
         conversationRepository.save(conversation);
 
         ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
-        publishConversationUpdated(conversation);
+        socketPublisher.publishConversationUpdatedAfterCommit(updatedConversation);
 
         return new BaseResponse<>(
                 conversationMapper.toDto(updatedConversation), "Group updated successfully.", HttpStatus.OK.value());
@@ -291,7 +287,7 @@ public class ConversationServiceImpl implements ConversationService {
         if (hasChanges) conversationRepository.save(conversation);
 
         ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
-        publishConversationUpdated(conversation);
+        socketPublisher.publishConversationUpdatedAfterCommit(updatedConversation);
 
         return new BaseResponse<>(
                 conversationMapper.toDto(updatedConversation), "Members added successfully.", HttpStatus.OK.value());
@@ -322,7 +318,8 @@ public class ConversationServiceImpl implements ConversationService {
         conversationRepository.save(conversation);
 
         ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
-        publishConversationUpdated(conversation);
+        socketPublisher.publishConversationRemovedAfterCommit(conversationId, List.of(memberId));
+        socketPublisher.publishConversationUpdatedAfterCommit(updatedConversation);
 
         return new BaseResponse<>(
                 conversationMapper.toDto(updatedConversation),
@@ -347,7 +344,9 @@ public class ConversationServiceImpl implements ConversationService {
         participantRepository.save(currentParticipant);
         conversationRepository.save(conversation);
 
-        publishConversationUpdated(conversation);
+        ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
+        socketPublisher.publishConversationRemovedAfterCommit(conversationId, List.of(currentUser.id()));
+        socketPublisher.publishConversationUpdatedAfterCommit(updatedConversation);
 
         return new BaseResponse<>(null, "Left group successfully.", HttpStatus.OK.value());
     }
@@ -392,8 +391,8 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     private ConversationEntity findConversationWithDetails(UUID conversationId) {
-        return conversationRepository.findConversationsWithDetails(List.of(conversationId)).stream()
-                .findFirst()
+        return conversationRepository
+                .findWithDetails(conversationId)
                 .orElseThrow(() -> new NotFoundException("Conversation not found."));
     }
 
@@ -403,14 +402,6 @@ public class ConversationServiceImpl implements ConversationService {
         if (!participantRepository.existsByIdConversationIdAndIdUserIdAndLeftAtIsNullAndDeletedAtIsNull(
                 conversationId, userId))
             throw new ForbiddenException("You are not a participant of this conversation.");
-    }
-
-    /** Tells every active participant that the conversation changed (name, members, last message). */
-    private void publishConversationUpdated(ConversationEntity conversation) {
-        MessageDto lastMessage =
-                conversation.getLastMessage() == null ? null : messageMapper.toDto(conversation.getLastMessage());
-        socketPublisher.publishConversationUpdatedAfterCommit(
-                conversation.getId(), lastMessage, conversation.getLastMessageAt());
     }
 
     private BaseResponse<ConversationDto> createDirectConversation(UUID currentUserId, List<UUID> memberIds) {
@@ -423,6 +414,7 @@ public class ConversationServiceImpl implements ConversationService {
         ConversationEntity conversation = findOrCreateDirectConversation(currentUserId, participantId);
         participantRepository.restoreDeletedParticipant(conversation.getId(), currentUserId);
         conversation = findConversationWithDetails(conversation.getId());
+        socketPublisher.publishConversationUpdatedAfterCommit(conversation);
 
         return new BaseResponse<>(
                 conversationMapper.toDto(conversation),
@@ -463,6 +455,7 @@ public class ConversationServiceImpl implements ConversationService {
         }
         participantRepository.flush();
         conversation.setParticipants(participants);
+        socketPublisher.publishConversationUpdatedAfterCommit(conversation);
 
         return new BaseResponse<>(
                 conversationMapper.toDto(conversation),

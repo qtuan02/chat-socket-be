@@ -127,6 +127,7 @@ class MessageServiceImplTest {
         ConversationEntity conversation = TestFixtures.conversation(CONVERSATION_ID, ConversationType.DIRECT);
         when(conversationService.findOrCreateDirectConversation(BIG, SMALL)).thenReturn(conversation);
         when(userRepository.findById(BIG)).thenReturn(Optional.of(sender));
+        when(conversationRepository.findWithDetails(CONVERSATION_ID)).thenReturn(Optional.of(conversation));
         MessageDto dto = stubMessagePersistence(conversation, sender);
 
         BaseResponse<MessageDto> response =
@@ -140,7 +141,7 @@ class MessageServiceImplTest {
         verify(participantRepository).restoreDeletedParticipantsByConversationId(CONVERSATION_ID);
         verify(conversationRepository).save(conversation);
         verify(participantRepository).save(any(ParticipantEntity.class));
-        verify(socketPublisher).publishMessageAfterCommit(CONVERSATION_ID, dto, TestFixtures.FIXED_TIME);
+        verify(socketPublisher).publishMessageCreatedAfterCommit(conversation, dto);
     }
 
     // Ratified in spec: delegating to ConversationService changed this 404's text from
@@ -217,6 +218,7 @@ class MessageServiceImplTest {
                         CONVERSATION_ID, BIG))
                 .thenReturn(true);
         when(userRepository.findById(BIG)).thenReturn(Optional.of(sender));
+        when(conversationRepository.findWithDetails(CONVERSATION_ID)).thenReturn(Optional.of(conversation));
         MessageDto dto = stubMessagePersistence(conversation, sender);
 
         BaseResponse<MessageDto> response = service.sendGroupMessage(
@@ -226,6 +228,6 @@ class MessageServiceImplTest {
         assertThat(response.data()).isEqualTo(dto);
         assertThat(conversation.getLastMessage().getType()).isEqualTo(MessageType.IMAGE);
         assertThat(conversation.getLastMessage().getAttachmentUrl()).isEqualTo("http://file");
-        verify(socketPublisher).publishMessageAfterCommit(CONVERSATION_ID, dto, TestFixtures.FIXED_TIME);
+        verify(socketPublisher).publishMessageCreatedAfterCommit(conversation, dto);
     }
 }
