@@ -72,4 +72,8 @@ public class ParticipantEntity {
 
     @Column(name = "muted_until")
     private LocalDateTime mutedUntil;
+
+    public boolean isActive() {
+        return leftAt == null && deletedAt == null;
+    }
 }

@@ -1,5 +1,6 @@
 package com.chat_socket.repository;
 
+import com.chat_socket.dto.UserPair;
 import com.chat_socket.entity.FriendEntity;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -15,6 +16,11 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface FriendRepository extends JpaRepository<FriendEntity, UUID> {
     boolean existsByUserAIdAndUserBId(UUID userAId, UUID userBId);
+
+    default boolean existsFriendship(UUID userId, UUID otherUserId) {
+        UserPair pair = UserPair.of(userId, otherUserId);
+        return existsByUserAIdAndUserBId(pair.userAId(), pair.userBId());
+    }
 
     long deleteByUserAIdAndUserBId(UUID userAId, UUID userBId);
 

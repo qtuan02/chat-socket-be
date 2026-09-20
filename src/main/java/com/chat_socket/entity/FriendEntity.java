@@ -54,6 +54,11 @@ public class FriendEntity {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    /** The friend on the other side of this friendship from {@code userId}. */
+    public UserEntity otherUser(UUID userId) {
+        return userA.getId().equals(userId) ? userB : userA;
+    }
+
     @PrePersist
     @PreUpdate
     private void normalizeUserOrder() {
