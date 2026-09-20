@@ -19,10 +19,6 @@ public class MessageDirectPermission {
         this.friendRepository = friendRepository;
     }
 
-    public boolean canSendDirect(UUID recipientId) {
-        return true;
-    }
-
     public boolean canCreateConversation(ConversationRequest request) {
         if (request == null || request.type() == ConversationType.DIRECT) return true;
 

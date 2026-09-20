@@ -23,7 +23,6 @@ public class MessageController {
     }
 
     @PostMapping("/direct")
-    @PreAuthorize("@messageDirectPermission.canSendDirect(#request.recipientId())")
     public ResponseEntity<BaseResponse<MessageDto>> sendDirectMessage(@Valid @RequestBody MessageRequest request) {
         BaseResponse<MessageDto> body = messageService.sendDirectMessage(request);
         return ResponseEntity.status(body.status()).body(body);

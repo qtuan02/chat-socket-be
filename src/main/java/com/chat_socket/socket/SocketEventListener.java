@@ -1,5 +1,6 @@
 package com.chat_socket.socket;
 
+import com.chat_socket.constant.SocketChannel;
 import com.chat_socket.dto.UserSecurity;
 import com.chat_socket.utils.Security;
 import java.security.Principal;
@@ -32,7 +33,7 @@ public class SocketEventListener {
 
         String sessionId = event.getMessage().getHeaders().get("simpSessionId").toString();
         userOnlineRegistry.markOnline(userSecurity.id(), sessionId);
-        socketEmitter.emit("/online-users", userOnlineRegistry.onlineUserIds());
+        socketEmitter.emit(SocketChannel.ONLINE_USERS, userOnlineRegistry.onlineUserIds());
     }
 
     @EventListener
@@ -42,6 +43,6 @@ public class SocketEventListener {
         if (userSecurity == null) return;
 
         userOnlineRegistry.markOffline(userSecurity.id(), event.getSessionId());
-        socketEmitter.emit("/online-users", userOnlineRegistry.onlineUserIds());
+        socketEmitter.emit(SocketChannel.ONLINE_USERS, userOnlineRegistry.onlineUserIds());
     }
 }

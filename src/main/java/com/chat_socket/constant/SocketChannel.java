@@ -8,6 +8,7 @@ public interface SocketChannel {
     String CONVERSATION = "/conversations";
     String MESSAGE = "/messages";
     String SEEN = "/seen";
+    String ONLINE_USERS = "/online-users";
 
     String CONVERSATION_QUEUE = QUEUE + CONVERSATION;
     String MESSAGE_TOPIC = CONVERSATION + "/%s" + MESSAGE;

@@ -42,12 +42,6 @@ class MessageDirectPermissionTest {
     }
 
     @Test
-    void canSendDirect_singleRecipient_alwaysTrue() { // deleted in Task 16 together with the no-op @PreAuthorize
-        assertThat(permission.canSendDirect(SMALL)).isTrue();
-        assertThat(permission.canSendDirect((UUID) null)).isTrue();
-    }
-
-    @Test
     void canCreateConversation_nullOrDirect_isAllowedWithoutChecks() {
         assertThat(permission.canCreateConversation(null)).isTrue();
         assertThat(permission.canCreateConversation(
