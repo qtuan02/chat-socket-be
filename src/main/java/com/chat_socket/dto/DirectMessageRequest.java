@@ -1,0 +1,11 @@
+package com.chat_socket.dto;
+
+import com.chat_socket.enums.MessageType;
+import jakarta.validation.constraints.NotNull;
+import java.util.UUID;
+
+public record DirectMessageRequest(
+        @NotNull(message = "Recipient is required") UUID recipientId,
+        String content,
+        MessageType type,
+        String attachmentUrl) {}

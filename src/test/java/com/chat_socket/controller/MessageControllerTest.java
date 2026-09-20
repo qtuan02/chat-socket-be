@@ -8,7 +8,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.chat_socket.config.GlobalExceptionHandler;
 import com.chat_socket.dto.BaseResponse;
-import com.chat_socket.dto.MessageRequest;
+import com.chat_socket.dto.DirectMessageRequest;
+import com.chat_socket.dto.GroupMessageRequest;
 import com.chat_socket.exception.ForbiddenException;
 import com.chat_socket.service.MessageService;
 import java.util.UUID;
@@ -40,7 +41,7 @@ class MessageControllerTest {
 
     @Test
     void sendDirect_validBody_returns201() throws Exception {
-        when(messageService.sendDirectMessage(new MessageRequest(ID, "hi", null, null, null)))
+        when(messageService.sendDirectMessage(new DirectMessageRequest(ID, "hi", null, null)))
                 .thenReturn(new BaseResponse<>(null, "Message sent successfully.", 201));
 
         mockMvc.perform(post("/v1/message/direct")
@@ -51,17 +52,17 @@ class MessageControllerTest {
     }
 
     @Test
-    void sendDirect_blankContent_returns400Validation() throws Exception {
+    void sendDirect_missingRecipientId_returns400Validation() throws Exception {
         mockMvc.perform(post("/v1/message/direct")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"recipientId\":\"" + ID + "\",\"content\":\"  \"}"))
+                        .content("{\"content\":\"hi\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.data.content").value("Content is required"));
+                .andExpect(jsonPath("$.data.recipientId").value("Recipient is required"));
     }
 
     @Test
     void sendGroup_forbiddenException_returns403() throws Exception {
-        when(messageService.sendGroupMessage(new MessageRequest(null, "hi", null, ID, null)))
+        when(messageService.sendGroupMessage(new GroupMessageRequest(ID, "hi", null, null)))
                 .thenThrow(new ForbiddenException("You are not a participant of this conversation."));
 
         mockMvc.perform(post("/v1/message/group")
@@ -74,7 +75,7 @@ class MessageControllerTest {
     @Test
     void sendGroup_isGuardedByMessageGroupPermission() throws Exception {
         PreAuthorize guard = MessageController.class
-                .getMethod("sendGroupMessage", MessageRequest.class)
+                .getMethod("sendGroupMessage", GroupMessageRequest.class)
                 .getAnnotation(PreAuthorize.class);
 
         assertThat(guard).isNotNull();
@@ -82,10 +83,13 @@ class MessageControllerTest {
     }
 
     @Test
-    void sendDirect_hasNoPreAuthorizeGuard() throws Exception {
-        assertThat(MessageController.class
-                        .getMethod("sendDirectMessage", MessageRequest.class)
-                        .getAnnotation(PreAuthorize.class))
-                .isNull();
+    void sendDirect_isGuardedByMessageDirectPermission() throws Exception {
+        PreAuthorize guard = MessageController.class
+                .getMethod("sendDirectMessage", DirectMessageRequest.class)
+                .getAnnotation(PreAuthorize.class);
+
+        assertThat(guard).isNotNull();
+        assertThat(guard.value())
+                .isEqualTo("@messageDirectPermission.canSendDirect(T(java.util.List).of(#request.recipientId()))");
     }
 }

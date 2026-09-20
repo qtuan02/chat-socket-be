@@ -1,9 +1,9 @@
 package com.chat_socket.service.impl;
 
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.DirectMessageRequest;
+import com.chat_socket.dto.GroupMessageRequest;
 import com.chat_socket.dto.MessageDto;
-import com.chat_socket.dto.MessageRequest;
-import com.chat_socket.dto.UserSecurity;
 import com.chat_socket.entity.ConversationEntity;
 import com.chat_socket.entity.MessageEntity;
 import com.chat_socket.entity.ParticipantEntity;
@@ -57,27 +57,18 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     @Transactional
-    public BaseResponse<MessageDto> sendDirectMessage(MessageRequest request) {
-        UserSecurity currentUser = Security.getCurrentUser();
-        UUID senderId = currentUser.id();
-
-        if (request.content() == null || request.content().isBlank())
-            throw new BadRequestException("Content is required.");
-
-        if (request.conversationId() == null && request.recipientId() == null)
-            throw new BadRequestException("Recipient is required.");
-
-        if (request.conversationId() == null && senderId.equals(request.recipientId()))
+    public BaseResponse<MessageDto> sendDirectMessage(DirectMessageRequest request) {
+        UUID senderId = Security.getCurrentUser().id();
+        validateContent(request.content(), request.type(), request.attachmentUrl());
+        if (senderId.equals(request.recipientId()))
             throw new BadRequestException("You cannot send a direct message to yourself.");
 
-        ConversationEntity conversation = request.conversationId() != null
-                ? getDirectConversationForSender(request.conversationId(), senderId)
-                : conversationService.findOrCreateDirectConversation(senderId, request.recipientId());
-
+        ConversationEntity conversation =
+                conversationService.findOrCreateDirectConversation(senderId, request.recipientId());
         UserEntity sender =
                 userRepository.findById(senderId).orElseThrow(() -> new NotFoundException("User not found."));
-
-        MessageEntity message = createMessage(conversation, sender, request);
+        MessageEntity message =
+                createMessage(conversation, sender, request.content(), request.type(), request.attachmentUrl());
         MessageDto messageDto = messageMapper.toDto(message);
 
         socketPublisher.publishMessageAfterCommit(conversation.getId(), messageDto, conversation.getLastMessageAt());
@@ -87,20 +78,15 @@ public class MessageServiceImpl implements MessageService {
 
     @Override
     @Transactional
-    public BaseResponse<MessageDto> sendGroupMessage(MessageRequest request) {
-        UserSecurity currentUser = Security.getCurrentUser();
-        UUID senderId = currentUser.id();
-
-        if (request.content() == null || request.content().isBlank())
-            throw new BadRequestException("Content is required.");
-
-        if (request.conversationId() == null) throw new BadRequestException("Conversation is required.");
+    public BaseResponse<MessageDto> sendGroupMessage(GroupMessageRequest request) {
+        UUID senderId = Security.getCurrentUser().id();
+        validateContent(request.content(), request.type(), request.attachmentUrl());
 
         ConversationEntity conversation = getGroupConversationForSender(request.conversationId(), senderId);
         UserEntity sender =
                 userRepository.findById(senderId).orElseThrow(() -> new NotFoundException("User not found."));
-
-        MessageEntity message = createMessage(conversation, sender, request);
+        MessageEntity message =
+                createMessage(conversation, sender, request.content(), request.type(), request.attachmentUrl());
         MessageDto messageDto = messageMapper.toDto(message);
 
         socketPublisher.publishMessageAfterCommit(conversation.getId(), messageDto, conversation.getLastMessageAt());
@@ -108,15 +94,30 @@ public class MessageServiceImpl implements MessageService {
         return new BaseResponse<>(messageDto, "Message sent successfully.", HttpStatus.CREATED.value());
     }
 
-    private MessageEntity createMessage(ConversationEntity conversation, UserEntity sender, MessageRequest request) {
+    private static void validateContent(String content, MessageType type, String attachmentUrl) {
+        boolean hasContent = content != null && !content.isBlank();
+        boolean hasAttachment = attachmentUrl != null && !attachmentUrl.isBlank();
+        if (!hasContent && !hasAttachment) throw new BadRequestException("Content or attachment is required.");
+        if (hasAttachment && type != MessageType.IMAGE && type != MessageType.FILE)
+            throw new BadRequestException("Type must be IMAGE or FILE when attaching a file.");
+        if (!hasAttachment && type != null && type != MessageType.TEXT)
+            throw new BadRequestException("Type must be TEXT without an attachment.");
+    }
+
+    private MessageEntity createMessage(
+            ConversationEntity conversation,
+            UserEntity sender,
+            String content,
+            MessageType type,
+            String attachmentUrl) {
         participantRepository.restoreDeletedParticipantsByConversationId(conversation.getId());
 
         MessageEntity message = new MessageEntity();
         message.setConversation(conversation);
         message.setSender(sender);
-        message.setContent(request.content());
-        message.setAttachmentUrl(request.attachmentUrl());
-        message.setType(request.type() == null ? MessageType.TEXT : request.type());
+        message.setContent(content);
+        message.setAttachmentUrl(attachmentUrl);
+        message.setType(type == null ? MessageType.TEXT : type);
 
         message = messageRepository.saveAndFlush(message);
 
@@ -128,21 +129,6 @@ public class MessageServiceImpl implements MessageService {
         markSenderAsRead(conversation, sender, message, messageCreatedAt);
 
         return message;
-    }
-
-    private ConversationEntity getDirectConversationForSender(UUID conversationId, UUID senderId) {
-        ConversationEntity conversation = conversationRepository
-                .findById(conversationId)
-                .orElseThrow(() -> new NotFoundException("Conversation not found."));
-
-        if (conversation.getType() != ConversationType.DIRECT)
-            throw new NotFoundException("Direct conversation not found.");
-
-        if (!participantRepository.existsByIdConversationIdAndIdUserIdAndLeftAtIsNullAndDeletedAtIsNull(
-                conversationId, senderId))
-            throw new ForbiddenException("You are not a participant of this conversation.");
-
-        return conversation;
     }
 
     private ConversationEntity getGroupConversationForSender(UUID conversationId, UUID senderId) {

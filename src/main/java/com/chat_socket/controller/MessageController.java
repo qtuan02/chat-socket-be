@@ -2,8 +2,9 @@ package com.chat_socket.controller;
 
 import com.chat_socket.constant.RouteApi;
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.DirectMessageRequest;
+import com.chat_socket.dto.GroupMessageRequest;
 import com.chat_socket.dto.MessageDto;
-import com.chat_socket.dto.MessageRequest;
 import com.chat_socket.service.MessageService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -23,14 +24,16 @@ public class MessageController {
     }
 
     @PostMapping("/direct")
-    public ResponseEntity<BaseResponse<MessageDto>> sendDirectMessage(@Valid @RequestBody MessageRequest request) {
+    @PreAuthorize("@messageDirectPermission.canSendDirect(T(java.util.List).of(#request.recipientId()))")
+    public ResponseEntity<BaseResponse<MessageDto>> sendDirectMessage(
+            @Valid @RequestBody DirectMessageRequest request) {
         BaseResponse<MessageDto> body = messageService.sendDirectMessage(request);
         return ResponseEntity.status(body.status()).body(body);
     }
 
     @PostMapping("/group")
     @PreAuthorize("@messageGroupPermission.canSendGroup(#request.conversationId())")
-    public ResponseEntity<BaseResponse<MessageDto>> sendGroupMessage(@Valid @RequestBody MessageRequest request) {
+    public ResponseEntity<BaseResponse<MessageDto>> sendGroupMessage(@Valid @RequestBody GroupMessageRequest request) {
         BaseResponse<MessageDto> body = messageService.sendGroupMessage(request);
         return ResponseEntity.status(body.status()).body(body);
     }

@@ -9,8 +9,9 @@ import static org.mockito.Mockito.when;
 
 import com.chat_socket.TestFixtures;
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.DirectMessageRequest;
+import com.chat_socket.dto.GroupMessageRequest;
 import com.chat_socket.dto.MessageDto;
-import com.chat_socket.dto.MessageRequest;
 import com.chat_socket.entity.ConversationEntity;
 import com.chat_socket.entity.MessageEntity;
 import com.chat_socket.entity.ParticipantEntity;
@@ -19,7 +20,6 @@ import com.chat_socket.enums.ConversationType;
 import com.chat_socket.enums.MessageType;
 import com.chat_socket.enums.ParticipantRole;
 import com.chat_socket.exception.BadRequestException;
-import com.chat_socket.exception.ForbiddenException;
 import com.chat_socket.exception.NotFoundException;
 import com.chat_socket.mapper.MessageMapper;
 import com.chat_socket.repository.ConversationRepository;
@@ -106,77 +106,18 @@ class MessageServiceImplTest {
     void sendDirectMessage_blankContent_throwsBadRequest() {
         TestFixtures.authenticateAs(BIG);
 
-        assertThatThrownBy(() -> service.sendDirectMessage(new MessageRequest(SMALL, "  ", null, null, null)))
+        assertThatThrownBy(() -> service.sendDirectMessage(new DirectMessageRequest(SMALL, "  ", null, null)))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessage("Content is required.");
-    }
-
-    @Test
-    void sendDirectMessage_noRecipientAndNoConversation_throwsBadRequest() {
-        TestFixtures.authenticateAs(BIG);
-
-        assertThatThrownBy(() -> service.sendDirectMessage(new MessageRequest(null, "hi", null, null, null)))
-                .isInstanceOf(BadRequestException.class)
-                .hasMessage("Recipient is required.");
+                .hasMessage("Content or attachment is required.");
     }
 
     @Test
     void sendDirectMessage_toSelf_throwsBadRequest() {
         TestFixtures.authenticateAs(BIG);
 
-        assertThatThrownBy(() -> service.sendDirectMessage(new MessageRequest(BIG, "hi", null, null, null)))
+        assertThatThrownBy(() -> service.sendDirectMessage(new DirectMessageRequest(BIG, "hi", null, null)))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessage("You cannot send a direct message to yourself.");
-    }
-
-    @Test
-    void sendDirectMessage_conversationIsGroup_throwsNotFound() {
-        TestFixtures.authenticateAs(BIG);
-        when(conversationRepository.findById(CONVERSATION_ID))
-                .thenReturn(Optional.of(TestFixtures.conversation(CONVERSATION_ID, ConversationType.GROUP)));
-
-        assertThatThrownBy(() -> service.sendDirectMessage(new MessageRequest(null, "hi", null, CONVERSATION_ID, null)))
-                .isInstanceOf(NotFoundException.class)
-                .hasMessage("Direct conversation not found.");
-    }
-
-    @Test
-    void sendDirectMessage_notParticipant_throwsForbidden() {
-        TestFixtures.authenticateAs(BIG);
-        when(conversationRepository.findById(CONVERSATION_ID))
-                .thenReturn(Optional.of(TestFixtures.conversation(CONVERSATION_ID, ConversationType.DIRECT)));
-        when(participantRepository.existsByIdConversationIdAndIdUserIdAndLeftAtIsNullAndDeletedAtIsNull(
-                        CONVERSATION_ID, BIG))
-                .thenReturn(false);
-
-        assertThatThrownBy(() -> service.sendDirectMessage(new MessageRequest(null, "hi", null, CONVERSATION_ID, null)))
-                .isInstanceOf(ForbiddenException.class);
-    }
-
-    @Test
-    void sendDirectMessage_existingConversation_savesMessageUpdatesConversationAndPublishes() {
-        TestFixtures.authenticateAs(BIG);
-        UserEntity sender = TestFixtures.user(BIG);
-        ConversationEntity conversation = TestFixtures.conversation(CONVERSATION_ID, ConversationType.DIRECT);
-        when(conversationRepository.findById(CONVERSATION_ID)).thenReturn(Optional.of(conversation));
-        when(participantRepository.existsByIdConversationIdAndIdUserIdAndLeftAtIsNullAndDeletedAtIsNull(
-                        CONVERSATION_ID, BIG))
-                .thenReturn(true);
-        when(userRepository.findById(BIG)).thenReturn(Optional.of(sender));
-        MessageDto dto = stubMessagePersistence(conversation, sender);
-
-        BaseResponse<MessageDto> response =
-                service.sendDirectMessage(new MessageRequest(null, "hi", null, CONVERSATION_ID, null));
-
-        assertThat(response.status()).isEqualTo(201);
-        assertThat(response.data()).isEqualTo(dto);
-        assertThat(conversation.getLastMessage().getId()).isEqualTo(MESSAGE_ID);
-        assertThat(conversation.getLastMessageAt()).isEqualTo(TestFixtures.FIXED_TIME);
-        assertThat(conversation.getLastMessage().getType()).isEqualTo(MessageType.TEXT);
-        verify(participantRepository).restoreDeletedParticipantsByConversationId(CONVERSATION_ID);
-        verify(conversationRepository).save(conversation);
-        verify(participantRepository).save(any(ParticipantEntity.class));
-        verify(socketPublisher).publishMessageAfterCommit(CONVERSATION_ID, dto, TestFixtures.FIXED_TIME);
     }
 
     @Test
@@ -189,10 +130,16 @@ class MessageServiceImplTest {
         MessageDto dto = stubMessagePersistence(conversation, sender);
 
         BaseResponse<MessageDto> response =
-                service.sendDirectMessage(new MessageRequest(SMALL, "hi", null, null, null));
+                service.sendDirectMessage(new DirectMessageRequest(SMALL, "hi", null, null));
 
         assertThat(response.status()).isEqualTo(201);
-        verify(conversationRepository, never()).saveAndFlush(any());
+        assertThat(response.data()).isEqualTo(dto);
+        assertThat(conversation.getLastMessage().getId()).isEqualTo(MESSAGE_ID);
+        assertThat(conversation.getLastMessageAt()).isEqualTo(TestFixtures.FIXED_TIME);
+        assertThat(conversation.getLastMessage().getType()).isEqualTo(MessageType.TEXT);
+        verify(participantRepository).restoreDeletedParticipantsByConversationId(CONVERSATION_ID);
+        verify(conversationRepository).save(conversation);
+        verify(participantRepository).save(any(ParticipantEntity.class));
         verify(socketPublisher).publishMessageAfterCommit(CONVERSATION_ID, dto, TestFixtures.FIXED_TIME);
     }
 
@@ -205,7 +152,7 @@ class MessageServiceImplTest {
         when(conversationService.findOrCreateDirectConversation(BIG, SMALL))
                 .thenThrow(new NotFoundException("User not found."));
 
-        assertThatThrownBy(() -> service.sendDirectMessage(new MessageRequest(SMALL, "hi", null, null, null)))
+        assertThatThrownBy(() -> service.sendDirectMessage(new DirectMessageRequest(SMALL, "hi", null, null)))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage("User not found.");
     }
@@ -214,18 +161,38 @@ class MessageServiceImplTest {
     void sendGroupMessage_blankContent_throwsBadRequest() {
         TestFixtures.authenticateAs(BIG);
 
-        assertThatThrownBy(() -> service.sendGroupMessage(new MessageRequest(null, "", null, CONVERSATION_ID, null)))
+        assertThatThrownBy(() -> service.sendGroupMessage(new GroupMessageRequest(CONVERSATION_ID, "", null, null)))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessage("Content is required.");
+                .hasMessage("Content or attachment is required.");
     }
 
     @Test
-    void sendGroupMessage_noConversation_throwsBadRequest() {
-        TestFixtures.authenticateAs(BIG);
+    void sendGroupMessage_attachmentWithTextType_throwsBadRequest() {
+        TestFixtures.authenticateAs(SMALL);
 
-        assertThatThrownBy(() -> service.sendGroupMessage(new MessageRequest(null, "hi", null, null, null)))
+        assertThatThrownBy(() -> service.sendGroupMessage(
+                        new GroupMessageRequest(CONVERSATION_ID, null, MessageType.TEXT, "http://file")))
                 .isInstanceOf(BadRequestException.class)
-                .hasMessage("Conversation is required.");
+                .hasMessage("Type must be IMAGE or FILE when attaching a file.");
+    }
+
+    @Test
+    void sendGroupMessage_noAttachmentWithImageType_throwsBadRequest() {
+        TestFixtures.authenticateAs(SMALL);
+
+        assertThatThrownBy(() -> service.sendGroupMessage(
+                        new GroupMessageRequest(CONVERSATION_ID, "hi", MessageType.IMAGE, null)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Type must be TEXT without an attachment.");
+    }
+
+    @Test
+    void sendGroupMessage_blankContentWithoutAttachment_throwsBadRequest() {
+        TestFixtures.authenticateAs(SMALL);
+
+        assertThatThrownBy(() -> service.sendGroupMessage(new GroupMessageRequest(CONVERSATION_ID, " ", null, null)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Content or attachment is required.");
     }
 
     @Test
@@ -234,7 +201,7 @@ class MessageServiceImplTest {
         when(conversationRepository.findById(CONVERSATION_ID))
                 .thenReturn(Optional.of(TestFixtures.conversation(CONVERSATION_ID, ConversationType.DIRECT)));
 
-        assertThatThrownBy(() -> service.sendGroupMessage(new MessageRequest(null, "hi", null, CONVERSATION_ID, null)))
+        assertThatThrownBy(() -> service.sendGroupMessage(new GroupMessageRequest(CONVERSATION_ID, "hi", null, null)))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage("Group conversation not found.");
         verify(messageRepository, never()).saveAndFlush(any());
@@ -253,7 +220,7 @@ class MessageServiceImplTest {
         MessageDto dto = stubMessagePersistence(conversation, sender);
 
         BaseResponse<MessageDto> response = service.sendGroupMessage(
-                new MessageRequest(null, "hi", "http://file", CONVERSATION_ID, MessageType.IMAGE));
+                new GroupMessageRequest(CONVERSATION_ID, "hi", MessageType.IMAGE, "http://file"));
 
         assertThat(response.status()).isEqualTo(201);
         assertThat(response.data()).isEqualTo(dto);
