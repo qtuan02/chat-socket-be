@@ -9,11 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.chat_socket.config.GlobalExceptionHandler;
 import com.chat_socket.dto.BaseResponse;
-import com.chat_socket.dto.FriendActionRequest;
 import com.chat_socket.dto.FriendRequestResponse;
 import com.chat_socket.dto.FriendSendRequest;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
+import com.chat_socket.dto.UserSummaryDto;
 import com.chat_socket.exception.NotFoundException;
 import com.chat_socket.service.FriendService;
 import java.util.List;
@@ -89,31 +89,31 @@ class FriendControllerTest {
 
     @Test
     void acceptFriendRequest_notFound_returns404() throws Exception {
-        when(friendService.acceptFriendRequest(new FriendActionRequest(ID)))
-                .thenThrow(new NotFoundException("Friend request not found."));
+        when(friendService.acceptFriendRequest(ID)).thenThrow(new NotFoundException("Friend request not found."));
 
-        mockMvc.perform(post("/v1/friend/accept")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"requestId\":\"" + ID + "\"}"))
+        mockMvc.perform(post("/v1/friend/request/{requestId}/accept", ID))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.message").value("Friend request not found."));
     }
 
     @Test
+    void acceptFriendRequest_returns201WithUser() throws Exception {
+        when(friendService.acceptFriendRequest(ID))
+                .thenReturn(new BaseResponse<>(new UserSummaryDto(ID, "bob", "B", "L", null), "ok", 201));
+
+        mockMvc.perform(post("/v1/friend/request/{requestId}/accept", ID))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.data.username").value("bob"));
+    }
+
+    @Test
     void declineAndCancel_returnServiceStatus() throws Exception {
-        when(friendService.declineFriendRequest(new FriendActionRequest(ID)))
-                .thenReturn(new BaseResponse<>(null, null, 204));
-        when(friendService.cancelFriendRequest(new FriendActionRequest(ID)))
+        when(friendService.declineFriendRequest(ID)).thenReturn(new BaseResponse<>(null, null, 204));
+        when(friendService.cancelFriendRequest(ID))
                 .thenReturn(new BaseResponse<>(null, "You are not authorized to cancel this request.", 403));
 
-        mockMvc.perform(post("/v1/friend/decline")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"requestId\":\"" + ID + "\"}"))
-                .andExpect(status().isNoContent());
-        mockMvc.perform(post("/v1/friend/cancel")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"requestId\":\"" + ID + "\"}"))
-                .andExpect(status().isForbidden());
+        mockMvc.perform(post("/v1/friend/request/{requestId}/decline", ID)).andExpect(status().isNoContent());
+        mockMvc.perform(delete("/v1/friend/request/{requestId}", ID)).andExpect(status().isForbidden());
     }
 
     @Test

@@ -10,23 +10,21 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.chat_socket.TestFixtures;
-import com.chat_socket.dto.AcceptFriendResponse;
 import com.chat_socket.dto.BaseResponse;
-import com.chat_socket.dto.FriendActionRequest;
 import com.chat_socket.dto.FriendDto;
-import com.chat_socket.dto.FriendRequestReceviedDto;
+import com.chat_socket.dto.FriendRequestDto;
 import com.chat_socket.dto.FriendRequestResponse;
-import com.chat_socket.dto.FriendRequestSentDto;
 import com.chat_socket.dto.FriendSendRequest;
 import com.chat_socket.dto.PaginationResponse;
+import com.chat_socket.dto.UserSummaryDto;
 import com.chat_socket.entity.FriendEntity;
 import com.chat_socket.entity.FriendRequestEntity;
 import com.chat_socket.entity.UserEntity;
 import com.chat_socket.enums.FriendRequestStatus;
 import com.chat_socket.exception.BadRequestException;
 import com.chat_socket.exception.NotFoundException;
-import com.chat_socket.mapper.FriendMapper;
 import com.chat_socket.mapper.FriendRequestMapper;
+import com.chat_socket.mapper.UserMapper;
 import com.chat_socket.repository.FriendRepository;
 import com.chat_socket.repository.FriendRequestRepository;
 import com.chat_socket.repository.UserRepository;
@@ -59,7 +57,7 @@ class FriendServiceImplTest {
     FriendRequestRepository friendRequestRepository;
 
     @Mock
-    FriendMapper friendMapper;
+    UserMapper userMapper;
 
     @Mock
     FriendRequestMapper friendRequestMapper;
@@ -69,7 +67,7 @@ class FriendServiceImplTest {
     @BeforeEach
     void setUp() {
         service = new FriendServiceImpl(
-                userRepository, friendRepository, friendRequestRepository, friendMapper, friendRequestMapper);
+                userRepository, friendRepository, friendRequestRepository, userMapper, friendRequestMapper);
     }
 
     @AfterEach
@@ -86,7 +84,7 @@ class FriendServiceImplTest {
         FriendDto dto = new FriendDto(SMALL, "u", "F", "L", null, null);
         when(friendRepository.findFriendshipsOfUser(eq(BIG), isNull(), isNull(), any(Pageable.class)))
                 .thenReturn(List.of(friendship));
-        when(friendMapper.toFriendDto(friend)).thenReturn(dto);
+        when(userMapper.toFriendDto(friend)).thenReturn(dto);
 
         BaseResponse<PaginationResponse<FriendDto>> response = service.getListFriend(null, null);
 
@@ -102,9 +100,8 @@ class FriendServiceImplTest {
                 UUID.randomUUID(), TestFixtures.user(BIG), TestFixtures.user(SMALL), FriendRequestStatus.PENDING);
         FriendRequestEntity received = TestFixtures.friendRequest(
                 UUID.randomUUID(), TestFixtures.user(SMALL), TestFixtures.user(BIG), FriendRequestStatus.PENDING);
-        FriendRequestSentDto sentDto = new FriendRequestSentDto(sent.getId(), BIG, null, null, null, null);
-        FriendRequestReceviedDto receivedDto =
-                new FriendRequestReceviedDto(received.getId(), BIG, null, null, null, null);
+        FriendRequestDto sentDto = new FriendRequestDto(sent.getId(), null, null, null);
+        FriendRequestDto receivedDto = new FriendRequestDto(received.getId(), null, null, null);
         when(friendRequestRepository.findFriendRequestsSentOfUser(BIG, FriendRequestStatus.PENDING))
                 .thenReturn(List.of(sent));
         when(friendRequestRepository.findFriendRequestsReceivedOfUser(BIG, FriendRequestStatus.PENDING))
@@ -184,7 +181,7 @@ class FriendServiceImplTest {
         UUID requestId = UUID.randomUUID();
         when(friendRequestRepository.findById(requestId)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.acceptFriendRequest(new FriendActionRequest(requestId)))
+        assertThatThrownBy(() -> service.acceptFriendRequest(requestId))
                 .isInstanceOf(NotFoundException.class)
                 .hasMessage("Friend request not found.");
     }
@@ -196,8 +193,7 @@ class FriendServiceImplTest {
                 UUID.randomUUID(), TestFixtures.user(BIG), TestFixtures.user(SMALL), FriendRequestStatus.PENDING);
         when(friendRequestRepository.findById(request.getId())).thenReturn(Optional.of(request));
 
-        BaseResponse<AcceptFriendResponse> response =
-                service.acceptFriendRequest(new FriendActionRequest(request.getId()));
+        BaseResponse<UserSummaryDto> response = service.acceptFriendRequest(request.getId());
 
         assertThat(response.status()).isEqualTo(403);
         verify(friendRepository, never()).save(any());
@@ -210,13 +206,12 @@ class FriendServiceImplTest {
         UserEntity to = TestFixtures.user(BIG);
         FriendRequestEntity request =
                 TestFixtures.friendRequest(UUID.randomUUID(), from, to, FriendRequestStatus.PENDING);
-        AcceptFriendResponse dto = new AcceptFriendResponse(SMALL, "F", "L", null);
+        UserSummaryDto dto = new UserSummaryDto(SMALL, "user-" + SMALL, "F", "L", null);
         when(friendRequestRepository.findById(request.getId())).thenReturn(Optional.of(request));
         when(userRepository.findById(SMALL)).thenReturn(Optional.of(from));
-        when(friendMapper.toAcceptFriendResponse(from)).thenReturn(dto);
+        when(userMapper.toSummaryDto(from)).thenReturn(dto);
 
-        BaseResponse<AcceptFriendResponse> response =
-                service.acceptFriendRequest(new FriendActionRequest(request.getId()));
+        BaseResponse<UserSummaryDto> response = service.acceptFriendRequest(request.getId());
 
         assertThat(response.status()).isEqualTo(201);
         assertThat(response.data()).isEqualTo(dto);
@@ -235,7 +230,7 @@ class FriendServiceImplTest {
                 UUID.randomUUID(), TestFixtures.user(BIG), TestFixtures.user(SMALL), FriendRequestStatus.PENDING);
         when(friendRequestRepository.findById(request.getId())).thenReturn(Optional.of(request));
 
-        BaseResponse<String> response = service.declineFriendRequest(new FriendActionRequest(request.getId()));
+        BaseResponse<String> response = service.declineFriendRequest(request.getId());
 
         assertThat(response.status()).isEqualTo(403);
     }
@@ -247,7 +242,7 @@ class FriendServiceImplTest {
                 UUID.randomUUID(), TestFixtures.user(SMALL), TestFixtures.user(BIG), FriendRequestStatus.PENDING);
         when(friendRequestRepository.findById(request.getId())).thenReturn(Optional.of(request));
 
-        BaseResponse<String> response = service.declineFriendRequest(new FriendActionRequest(request.getId()));
+        BaseResponse<String> response = service.declineFriendRequest(request.getId());
 
         assertThat(response.status()).isEqualTo(204);
         assertThat(request.getStatus()).isEqualTo(FriendRequestStatus.REJECTED);
@@ -261,7 +256,7 @@ class FriendServiceImplTest {
                 UUID.randomUUID(), TestFixtures.user(SMALL), TestFixtures.user(BIG), FriendRequestStatus.PENDING);
         when(friendRequestRepository.findById(request.getId())).thenReturn(Optional.of(request));
 
-        BaseResponse<String> response = service.cancelFriendRequest(new FriendActionRequest(request.getId()));
+        BaseResponse<String> response = service.cancelFriendRequest(request.getId());
 
         assertThat(response.status()).isEqualTo(403);
         verify(friendRequestRepository, never()).delete(any());
@@ -274,7 +269,7 @@ class FriendServiceImplTest {
                 UUID.randomUUID(), TestFixtures.user(BIG), TestFixtures.user(SMALL), FriendRequestStatus.PENDING);
         when(friendRequestRepository.findById(request.getId())).thenReturn(Optional.of(request));
 
-        BaseResponse<String> response = service.cancelFriendRequest(new FriendActionRequest(request.getId()));
+        BaseResponse<String> response = service.cancelFriendRequest(request.getId());
 
         assertThat(response.status()).isEqualTo(204);
         verify(friendRequestRepository).delete(request);
