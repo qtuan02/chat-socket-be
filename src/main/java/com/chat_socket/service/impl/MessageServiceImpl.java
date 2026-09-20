@@ -113,6 +113,34 @@ public class MessageServiceImpl implements MessageService {
         return new BaseResponse<>(messageDto, "Message updated successfully.", HttpStatus.OK.value());
     }
 
+    @Override
+    @Transactional
+    public BaseResponse<Void> deleteMessage(UUID messageId) {
+        UUID currentUserId = Security.getCurrentUser().id();
+        MessageEntity message =
+                getOwnMessageOrThrow(messageId, currentUserId, "You can only delete your own messages.");
+        boolean wasLast = isLastMessage(message);
+
+        message.setDeleted(true);
+        message = messageRepository.save(message);
+        MessageDto messageDto = messageMapper.toDto(message);
+
+        ConversationEntity conversation = message.getConversation();
+        socketPublisher.publishMessageDeletedAfterCommit(conversation.getId(), messageDto);
+
+        if (wasLast) {
+            MessageEntity previous = messageRepository
+                    .findTopByConversationIdAndDeletedFalseOrderByCreatedAtDescIdDesc(conversation.getId())
+                    .orElse(null);
+            conversation.setLastMessage(previous);
+            if (previous != null) conversation.setLastMessageAt(previous.getCreatedAt());
+            conversationRepository.save(conversation);
+            publishConversationUpdated(conversation.getId());
+        }
+
+        return new BaseResponse<>(null, null, HttpStatus.NO_CONTENT.value());
+    }
+
     private void publishMessageCreated(ConversationEntity conversation, MessageDto messageDto) {
         ConversationEntity updatedConversation = conversationRepository
                 .findWithDetails(conversation.getId())

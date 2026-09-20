@@ -298,4 +298,85 @@ class MessageServiceImplTest {
 
         verify(socketPublisher, never()).publishConversationUpdatedAfterCommit(any());
     }
+
+    // ---------- deleteMessage ----------
+
+    @Test
+    void deleteMessage_notSender_throwsForbidden() {
+        TestFixtures.authenticateAs(BIG);
+        ConversationEntity conversation = TestFixtures.conversation(CONVERSATION_ID, ConversationType.GROUP);
+        MessageEntity message = TestFixtures.message(UUID.randomUUID(), conversation, TestFixtures.user(SMALL));
+        when(messageRepository.findByIdAndDeletedFalse(message.getId())).thenReturn(Optional.of(message));
+
+        assertThatThrownBy(() -> service.deleteMessage(message.getId()))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("You can only delete your own messages.");
+    }
+
+    @Test
+    void deleteMessage_notLast_softDeletesAndPublishesOnlyMessageEvent() {
+        TestFixtures.authenticateAs(SMALL);
+        ConversationEntity conversation = TestFixtures.conversation(CONVERSATION_ID, ConversationType.GROUP);
+        MessageEntity message = TestFixtures.message(UUID.randomUUID(), conversation, TestFixtures.user(SMALL));
+        conversation.setLastMessage(TestFixtures.message(UUID.randomUUID(), conversation, TestFixtures.user(SMALL)));
+        MessageDto dto =
+                new MessageDto(message.getId(), CONVERSATION_ID, SMALL, "hello", null, MessageType.TEXT, null, null);
+        when(messageRepository.findByIdAndDeletedFalse(message.getId())).thenReturn(Optional.of(message));
+        when(messageRepository.save(message)).thenReturn(message);
+        when(messageMapper.toDto(message)).thenReturn(dto);
+
+        BaseResponse<Void> response = service.deleteMessage(message.getId());
+
+        assertThat(response.status()).isEqualTo(204);
+        assertThat(message.isDeleted()).isTrue();
+        verify(socketPublisher).publishMessageDeletedAfterCommit(CONVERSATION_ID, dto);
+        verify(socketPublisher, never()).publishConversationUpdatedAfterCommit(any());
+    }
+
+    @Test
+    void deleteMessage_last_pointsConversationToPreviousMessage() {
+        TestFixtures.authenticateAs(SMALL);
+        ConversationEntity conversation = TestFixtures.conversation(CONVERSATION_ID, ConversationType.GROUP);
+        MessageEntity previous = TestFixtures.message(UUID.randomUUID(), conversation, TestFixtures.user(SMALL));
+        previous.setCreatedAt(TestFixtures.FIXED_TIME.minusSeconds(60));
+        MessageEntity message = TestFixtures.message(UUID.randomUUID(), conversation, TestFixtures.user(SMALL));
+        conversation.setLastMessage(message);
+        when(messageRepository.findByIdAndDeletedFalse(message.getId())).thenReturn(Optional.of(message));
+        when(messageRepository.save(message)).thenReturn(message);
+        when(messageMapper.toDto(message))
+                .thenReturn(new MessageDto(
+                        message.getId(), CONVERSATION_ID, SMALL, "hello", null, MessageType.TEXT, null, null));
+        when(messageRepository.findTopByConversationIdAndDeletedFalseOrderByCreatedAtDescIdDesc(CONVERSATION_ID))
+                .thenReturn(Optional.of(previous));
+        when(conversationRepository.findWithDetails(CONVERSATION_ID)).thenReturn(Optional.of(conversation));
+
+        service.deleteMessage(message.getId());
+
+        assertThat(conversation.getLastMessage()).isSameAs(previous);
+        assertThat(conversation.getLastMessageAt()).isEqualTo(previous.getCreatedAt());
+        verify(conversationRepository).save(conversation);
+        verify(socketPublisher).publishConversationUpdatedAfterCommit(conversation);
+    }
+
+    @Test
+    void deleteMessage_lastAndOnlyMessage_clearsConversationLastMessage() {
+        TestFixtures.authenticateAs(SMALL);
+        ConversationEntity conversation = TestFixtures.conversation(CONVERSATION_ID, ConversationType.GROUP);
+        MessageEntity message = TestFixtures.message(UUID.randomUUID(), conversation, TestFixtures.user(SMALL));
+        conversation.setLastMessage(message);
+        when(messageRepository.findByIdAndDeletedFalse(message.getId())).thenReturn(Optional.of(message));
+        when(messageRepository.save(message)).thenReturn(message);
+        when(messageMapper.toDto(message))
+                .thenReturn(new MessageDto(
+                        message.getId(), CONVERSATION_ID, SMALL, "hello", null, MessageType.TEXT, null, null));
+        when(messageRepository.findTopByConversationIdAndDeletedFalseOrderByCreatedAtDescIdDesc(CONVERSATION_ID))
+                .thenReturn(Optional.empty());
+        when(conversationRepository.findWithDetails(CONVERSATION_ID)).thenReturn(Optional.of(conversation));
+
+        service.deleteMessage(message.getId());
+
+        assertThat(conversation.getLastMessage()).isNull();
+        assertThat(conversation.getLastMessageAt()).isEqualTo(TestFixtures.FIXED_TIME); // unchanged, keeps list order
+        verify(socketPublisher).publishConversationUpdatedAfterCommit(conversation);
+    }
 }

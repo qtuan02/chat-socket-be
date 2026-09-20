@@ -52,6 +52,8 @@ public interface MessageRepository extends JpaRepository<MessageEntity, UUID> {
 
     Optional<MessageEntity> findByIdAndDeletedFalse(UUID id);
 
+    Optional<MessageEntity> findTopByConversationIdAndDeletedFalseOrderByCreatedAtDescIdDesc(UUID conversationId);
+
     interface UnreadCountProjection {
         UUID getConversationId();
 

@@ -13,4 +13,6 @@ public interface MessageService {
     BaseResponse<MessageDto> sendGroupMessage(GroupMessageRequest request);
 
     BaseResponse<MessageDto> updateMessage(UUID messageId, UpdateMessageRequest request);
+
+    BaseResponse<Void> deleteMessage(UUID messageId);
 }

@@ -2,6 +2,7 @@ package com.chat_socket.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -112,5 +113,12 @@ class MessageControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"content\":\"edited\"}"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void deleteMessage_returns204() throws Exception {
+        when(messageService.deleteMessage(ID)).thenReturn(new BaseResponse<>(null, null, 204));
+
+        mockMvc.perform(delete("/v1/message/{id}", ID)).andExpect(status().isNoContent());
     }
 }
