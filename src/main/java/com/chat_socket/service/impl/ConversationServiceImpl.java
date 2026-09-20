@@ -32,7 +32,7 @@ import com.chat_socket.service.ConversationService;
 import com.chat_socket.socket.SocketPublisher;
 import com.chat_socket.utils.PaginationUtils;
 import com.chat_socket.utils.Security;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -179,7 +179,7 @@ public class ConversationServiceImpl implements ConversationService {
                 && participant.getLastReadMessage().getId().equals(lastMessage.getId()))
             return new BaseResponse<>(null, "Messages already marked as seen.", HttpStatus.OK.value());
 
-        LocalDateTime seenAt = LocalDateTime.now();
+        Instant seenAt = Instant.now();
 
         participant.setLastReadMessage(lastMessage);
         participant.setLastReadAt(seenAt);
@@ -202,7 +202,7 @@ public class ConversationServiceImpl implements ConversationService {
         ConversationEntity conversation = getGroupConversationOrThrow(conversationId);
         ParticipantEntity participant = getActiveAdminParticipantOrThrow(conversationId, currentUser.id());
 
-        LocalDateTime deletedAt = LocalDateTime.now();
+        Instant deletedAt = Instant.now();
         MessageEntity lastMessage = conversation.getLastMessage();
         participant.setDeletedAt(deletedAt);
         if (lastMessage != null) {
@@ -269,7 +269,7 @@ public class ConversationServiceImpl implements ConversationService {
                                 participant -> participant.getId().getUserId(), Function.identity()));
 
         boolean hasChanges = false;
-        LocalDateTime now = LocalDateTime.now();
+        Instant now = Instant.now();
         for (UUID memberId : uniqueMemberIds) {
             ParticipantEntity participant = existingParticipants.get(memberId);
             if (participant == null) {
@@ -317,7 +317,7 @@ public class ConversationServiceImpl implements ConversationService {
         if (targetParticipant.getRole() == ParticipantRole.ADMIN)
             throw new BadRequestException("You cannot remove an admin from this group.");
 
-        targetParticipant.setLeftAt(LocalDateTime.now());
+        targetParticipant.setLeftAt(Instant.now());
         participantRepository.save(targetParticipant);
         conversationRepository.save(conversation);
 
@@ -343,7 +343,7 @@ public class ConversationServiceImpl implements ConversationService {
             if (activeAdmins == 0) throw new BadRequestException("You are the only admin.You can't leaving.");
         }
 
-        currentParticipant.setLeftAt(LocalDateTime.now());
+        currentParticipant.setLeftAt(Instant.now());
         participantRepository.save(currentParticipant);
         conversationRepository.save(conversation);
 
@@ -451,7 +451,7 @@ public class ConversationServiceImpl implements ConversationService {
         conversation.setType(ConversationType.GROUP);
         conversation.setGroupName(name.trim());
         conversation.setCreatedBy(currentUser);
-        conversation.setLastMessageAt(LocalDateTime.now());
+        conversation.setLastMessageAt(Instant.now());
 
         conversation = conversationRepository.saveAndFlush(conversation);
 
@@ -474,7 +474,7 @@ public class ConversationServiceImpl implements ConversationService {
         ConversationEntity conversation = new ConversationEntity();
         conversation.setType(ConversationType.DIRECT);
         conversation.setCreatedBy(currentUser);
-        conversation.setLastMessageAt(LocalDateTime.now());
+        conversation.setLastMessageAt(Instant.now());
 
         if (pair.userAId().equals(currentUser.getId())) {
             conversation.setDirectUserA(currentUser);

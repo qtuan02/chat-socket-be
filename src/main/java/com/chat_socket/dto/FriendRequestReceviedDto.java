@@ -1,12 +1,7 @@
 package com.chat_socket.dto;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 public record FriendRequestReceviedDto(
-        UUID id,
-        UUID toUser,
-        AcceptFriendResponse fromUser,
-        String message,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt) {}
+        UUID id, UUID toUser, AcceptFriendResponse fromUser, String message, Instant createdAt, Instant updatedAt) {}

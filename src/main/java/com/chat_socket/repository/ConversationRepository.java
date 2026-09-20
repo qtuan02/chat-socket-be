@@ -2,7 +2,7 @@ package com.chat_socket.repository;
 
 import com.chat_socket.entity.ConversationEntity;
 import com.chat_socket.enums.ConversationType;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -56,7 +56,7 @@ public interface ConversationRepository extends JpaRepository<ConversationEntity
     List<UUID> findActiveConversationIdsForUserBeforeCursor(
             @Param("userId") UUID userId,
             @Param("type") ConversationType type,
-            @Param("cursor") LocalDateTime cursor,
+            @Param("cursor") Instant cursor,
             Pageable pageable);
 
     @Query("""

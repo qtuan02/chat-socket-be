@@ -1,7 +1,7 @@
 package com.chat_socket.dto;
 
 import com.chat_socket.enums.ConversationType;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -14,8 +14,8 @@ public record ConversationDto(
         UUID directUserBId,
         UUID lastMessageId,
         MessageDto lastMessage,
-        LocalDateTime lastMessageAt,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt,
+        Instant lastMessageAt,
+        Instant createdAt,
+        Instant updatedAt,
         long unreadCount,
         List<ConversationParticipantDto> participants) {}

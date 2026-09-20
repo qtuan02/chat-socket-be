@@ -1,7 +1,7 @@
 package com.chat_socket.repository;
 
 import com.chat_socket.entity.MessageEntity;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
@@ -47,7 +47,7 @@ public interface MessageRepository extends JpaRepository<MessageEntity, UUID> {
             ORDER BY m.createdAt DESC, m.id DESC
             """)
     List<MessageEntity> findMessagesBeforeCursor(
-            @Param("conversationId") UUID conversationId, @Param("cursor") LocalDateTime cursor, Pageable pageable);
+            @Param("conversationId") UUID conversationId, @Param("cursor") Instant cursor, Pageable pageable);
 
     interface UnreadCountProjection {
         UUID getConversationId();

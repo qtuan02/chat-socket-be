@@ -11,7 +11,7 @@ import com.chat_socket.entity.UserEntity;
 import com.chat_socket.enums.ConversationType;
 import com.chat_socket.enums.FriendRequestStatus;
 import com.chat_socket.enums.ParticipantRole;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -19,7 +19,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 /** Builders for entities and the security context. Tests that call authenticateAs must clearContext in @AfterEach. */
 public final class TestFixtures {
-    public static final LocalDateTime FIXED_TIME = LocalDateTime.of(2026, 1, 1, 12, 0);
+    public static final Instant FIXED_TIME = Instant.parse("2026-01-01T12:00:00Z");
 
     private TestFixtures() {}
 

@@ -7,7 +7,7 @@ import com.chat_socket.dto.ConversationSeenEvent;
 import com.chat_socket.dto.MessageDto;
 import com.chat_socket.repository.MessageRepository;
 import com.chat_socket.repository.ParticipantRepository;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Component;
@@ -29,7 +29,7 @@ public class SocketPublisher {
         this.messageRepository = messageRepository;
     }
 
-    public void publishMessageAfterCommit(UUID conversationId, MessageDto messageDto, LocalDateTime lastMessageAt) {
+    public void publishMessageAfterCommit(UUID conversationId, MessageDto messageDto, Instant lastMessageAt) {
         List<ConversationDelivery> updateDeliveries =
                 participantRepository.findActiveUserIdsByConversationId(conversationId).stream()
                         .map(userId -> new ConversationDelivery(
@@ -51,7 +51,7 @@ public class SocketPublisher {
     }
 
     public void publishConversationUpdatedAfterCommit(
-            UUID conversationId, MessageDto lastMessage, LocalDateTime lastMessageAt) {
+            UUID conversationId, MessageDto lastMessage, Instant lastMessageAt) {
         List<ConversationDelivery> updateDeliveries =
                 participantRepository.findActiveUserIdsByConversationId(conversationId).stream()
                         .map(userId -> new ConversationDelivery(
@@ -70,11 +70,7 @@ public class SocketPublisher {
     }
 
     public void publishConversationSeenAfterCommit(
-            UUID conversationId,
-            UUID userId,
-            MessageDto lastMessage,
-            LocalDateTime lastMessageAt,
-            LocalDateTime seenAt) {
+            UUID conversationId, UUID userId, MessageDto lastMessage, Instant lastMessageAt, Instant seenAt) {
         ConversationEvent event = ConversationEvent.updated(conversationId, lastMessage, lastMessageAt, 0);
         ConversationSeenEvent seenEvent = ConversationSeenEvent.seen(conversationId, userId, lastMessage.id(), seenAt);
 

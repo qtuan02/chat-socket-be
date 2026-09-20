@@ -1,11 +1,10 @@
 package com.chat_socket.utils;
 
+import com.chat_socket.constant.TimeFormat;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.exception.BadRequestException;
-import java.time.LocalDateTime;
-import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
+import java.time.Instant;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -21,7 +20,7 @@ public final class PaginationUtils {
 
     private PaginationUtils() {}
 
-    public record CursorPage(int limit, LocalDateTime cursor, PageRequest pageRequest) {
+    public record CursorPage(int limit, Instant cursor, PageRequest pageRequest) {
         public <T> List<T> items(List<T> fetchedItems) {
             if (fetchedItems.size() <= limit) return fetchedItems;
             return fetchedItems.subList(0, limit);
@@ -41,7 +40,7 @@ public final class PaginationUtils {
             if (limit < 1) throw new IllegalArgumentException("Limit must be greater than 0.");
 
             limit = Math.min(limit, MAX_LIMIT);
-            LocalDateTime cursor = parseDateTimeCursor(request == null ? null : request.cursor());
+            Instant cursor = parseDateTimeCursor(request == null ? null : request.cursor());
             return new CursorPage(limit, cursor, PageRequest.of(0, limit + 1));
         } catch (IllegalArgumentException ex) {
             throw new BadRequestException(ex.getMessage());
@@ -65,27 +64,20 @@ public final class PaginationUtils {
         }
     }
 
-    private static LocalDateTime parseDateTimeCursor(String cursor) {
+    private static Instant parseDateTimeCursor(String cursor) {
         if (cursor == null || cursor.isBlank()) return null;
-
-        String normalizedCursor = cursor.trim();
-        try {
-            return LocalDateTime.parse(normalizedCursor, DateTimeFormatter.ISO_LOCAL_DATE_TIME);
-        } catch (DateTimeParseException ignored) {
-            return OffsetDateTime.parse(normalizedCursor, DateTimeFormatter.ISO_OFFSET_DATE_TIME)
-                    .toLocalDateTime();
-        }
+        return Instant.parse(cursor.trim()); // accepts Z or an offset; no zone -> DateTimeParseException -> 400
     }
 
-    private static String formatDateTimeCursor(LocalDateTime cursor) {
-        return cursor.format(DateTimeFormatter.ISO_LOCAL_DATE_TIME);
+    private static String formatDateTimeCursor(Instant cursor) {
+        return TimeFormat.UTC_MICROS.format(cursor);
     }
 
     public static <T, R> PaginationResponse<R> toCursorResponse(
             List<T> fetchedItems,
             CursorPage page,
             Function<T, R> mapper,
-            Function<T, LocalDateTime> cursorExtractor,
+            Function<T, Instant> cursorExtractor,
             boolean reverseItems) {
         boolean hasNextPage = fetchedItems.size() > page.limit();
         List<T> pageItems = page.items(fetchedItems);

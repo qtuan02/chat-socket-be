@@ -1,7 +1,7 @@
 package com.chat_socket.dto;
 
 import com.chat_socket.enums.MessageType;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 public record MessageDto(
@@ -11,5 +11,5 @@ public record MessageDto(
         String content,
         String attachmentUrl,
         MessageType type,
-        LocalDateTime createdAt,
-        LocalDateTime updatedAt) {}
+        Instant createdAt,
+        Instant updatedAt) {}

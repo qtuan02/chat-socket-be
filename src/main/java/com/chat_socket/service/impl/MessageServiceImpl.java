@@ -22,7 +22,7 @@ import com.chat_socket.service.ConversationService;
 import com.chat_socket.service.MessageService;
 import com.chat_socket.socket.SocketPublisher;
 import com.chat_socket.utils.Security;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -120,7 +120,7 @@ public class MessageServiceImpl implements MessageService {
 
         message = messageRepository.saveAndFlush(message);
 
-        LocalDateTime messageCreatedAt = message.getCreatedAt() == null ? LocalDateTime.now() : message.getCreatedAt();
+        Instant messageCreatedAt = message.getCreatedAt() == null ? Instant.now() : message.getCreatedAt();
         conversation.setLastMessage(message);
         conversation.setLastMessageAt(messageCreatedAt);
         conversationRepository.save(conversation);
@@ -161,7 +161,7 @@ public class MessageServiceImpl implements MessageService {
     }
 
     private void markSenderAsRead(
-            ConversationEntity conversation, UserEntity sender, MessageEntity message, LocalDateTime readAt) {
+            ConversationEntity conversation, UserEntity sender, MessageEntity message, Instant readAt) {
         ParticipantEntity participant = participantRepository
                 .findByIdConversationIdAndIdUserId(conversation.getId(), sender.getId())
                 .orElseThrow(() -> new NotFoundException("Participant not found."));

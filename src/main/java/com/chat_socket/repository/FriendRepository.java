@@ -2,7 +2,7 @@ package com.chat_socket.repository;
 
 import com.chat_socket.dto.UserPair;
 import com.chat_socket.entity.FriendEntity;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -108,7 +108,7 @@ public interface FriendRepository extends JpaRepository<FriendEntity, UUID> {
             """)
     List<FriendEntity> findFriendshipsOfUserBeforeCursor(
             @Param("userId") UUID userId,
-            @Param("cursor") LocalDateTime cursor,
+            @Param("cursor") Instant cursor,
             @Param("usernameSearch") String usernameSearch,
             @Param("normalizedNameSearch") String normalizedNameSearch,
             Pageable pageable);

@@ -38,7 +38,7 @@ import com.chat_socket.repository.MessageRepository;
 import com.chat_socket.repository.ParticipantRepository;
 import com.chat_socket.repository.UserRepository;
 import com.chat_socket.socket.SocketPublisher;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -333,7 +333,7 @@ class ConversationServiceImplTest {
         UserEntity me = TestFixtures.user(BIG);
         MessageEntity newer = TestFixtures.message(UUID.randomUUID(), conversation, me);
         MessageEntity older = TestFixtures.message(UUID.randomUUID(), conversation, me);
-        older.setCreatedAt(TestFixtures.FIXED_TIME.minusMinutes(1));
+        older.setCreatedAt(TestFixtures.FIXED_TIME.minusSeconds(60));
         MessageDto newerDto = new MessageDto(newer.getId(), C, BIG, "n", null, MessageType.TEXT, null, null);
         MessageDto olderDto = new MessageDto(older.getId(), C, BIG, "o", null, MessageType.TEXT, null, null);
         when(conversationRepository.existsById(C)).thenReturn(true);
@@ -407,7 +407,7 @@ class ConversationServiceImplTest {
         verify(participantRepository).save(me);
         verify(socketPublisher)
                 .publishConversationSeenAfterCommit(
-                        eq(C), eq(BIG), eq(lastDto), eq(TestFixtures.FIXED_TIME), any(LocalDateTime.class));
+                        eq(C), eq(BIG), eq(lastDto), eq(TestFixtures.FIXED_TIME), any(Instant.class));
     }
 
     // ---------- deleteGroup ----------

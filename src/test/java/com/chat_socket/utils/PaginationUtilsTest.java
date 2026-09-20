@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.exception.BadRequestException;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
@@ -37,13 +37,24 @@ class PaginationUtilsTest {
     }
 
     @Test
-    void resolveCursorPage_parsesLocalAndOffsetCursor() {
-        assertThat(PaginationUtils.resolveCursorPage(new PaginationRequest(10, "2026-01-01T12:00:00", null))
-                        .cursor())
-                .isEqualTo(LocalDateTime.of(2026, 1, 1, 12, 0));
+    void resolveCursorPage_parsesUtcAndOffsetCursor() {
         assertThat(PaginationUtils.resolveCursorPage(new PaginationRequest(10, "2026-01-01T12:00:00Z", null))
                         .cursor())
-                .isEqualTo(LocalDateTime.of(2026, 1, 1, 12, 0));
+                .isEqualTo(Instant.parse("2026-01-01T12:00:00Z"));
+        assertThat(PaginationUtils.resolveCursorPage(new PaginationRequest(10, "2026-01-01T19:00:00+07:00", null))
+                        .cursor())
+                .isEqualTo(Instant.parse("2026-01-01T12:00:00Z"));
+        assertThat(PaginationUtils.resolveCursorPage(new PaginationRequest(10, "2026-01-01T12:00:00.123456Z", null))
+                        .cursor())
+                .isEqualTo(Instant.parse("2026-01-01T12:00:00.123456Z"));
+    }
+
+    @Test
+    void resolveCursorPage_localCursorWithoutZone_throwsBadRequest() {
+        assertThatThrownBy(
+                        () -> PaginationUtils.resolveCursorPage(new PaginationRequest(10, "2026-01-01T12:00:00", null)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Cursor is invalid.");
     }
 
     @Test
@@ -56,28 +67,28 @@ class PaginationUtilsTest {
     @Test
     void toCursorResponse_moreThanLimit_trimsAndSetsNextCursorFromLastKeptItem() {
         PaginationUtils.CursorPage page = PaginationUtils.resolveCursorPage(new PaginationRequest(2, null, null));
-        List<LocalDateTime> fetched = List.of(
-                LocalDateTime.of(2026, 1, 3, 0, 0),
-                LocalDateTime.of(2026, 1, 2, 0, 0),
-                LocalDateTime.of(2026, 1, 1, 0, 0));
+        List<Instant> fetched = List.of(
+                Instant.parse("2026-01-03T00:00:00Z"),
+                Instant.parse("2026-01-02T00:00:00Z"),
+                Instant.parse("2026-01-01T00:00:00Z"));
 
         PaginationResponse<String> response =
-                PaginationUtils.toCursorResponse(fetched, page, LocalDateTime::toString, Function.identity(), false);
+                PaginationUtils.toCursorResponse(fetched, page, Instant::toString, Function.identity(), false);
 
-        assertThat(response.messages()).containsExactly("2026-01-03T00:00", "2026-01-02T00:00");
-        assertThat(response.nextCursor()).isEqualTo("2026-01-02T00:00:00");
+        assertThat(response.messages()).containsExactly("2026-01-03T00:00:00Z", "2026-01-02T00:00:00Z");
+        assertThat(response.nextCursor()).isEqualTo("2026-01-02T00:00:00.000000Z");
         assertThat(response.nextOffset()).isNull();
     }
 
     @Test
     void toCursorResponse_reverseItems_reversesOrderAndKeepsCursorFromNewestFetchOrder() {
         PaginationUtils.CursorPage page = PaginationUtils.resolveCursorPage(new PaginationRequest(5, null, null));
-        List<LocalDateTime> fetched = List.of(LocalDateTime.of(2026, 1, 2, 0, 0), LocalDateTime.of(2026, 1, 1, 0, 0));
+        List<Instant> fetched = List.of(Instant.parse("2026-01-02T00:00:00Z"), Instant.parse("2026-01-01T00:00:00Z"));
 
         PaginationResponse<String> response =
-                PaginationUtils.toCursorResponse(fetched, page, LocalDateTime::toString, Function.identity(), true);
+                PaginationUtils.toCursorResponse(fetched, page, Instant::toString, Function.identity(), true);
 
-        assertThat(response.messages()).containsExactly("2026-01-01T00:00", "2026-01-02T00:00");
+        assertThat(response.messages()).containsExactly("2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z");
         assertThat(response.nextCursor()).isNull();
     }
 

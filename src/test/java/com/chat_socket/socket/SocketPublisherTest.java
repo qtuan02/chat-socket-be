@@ -15,7 +15,7 @@ import com.chat_socket.dto.MessageDto;
 import com.chat_socket.enums.MessageType;
 import com.chat_socket.repository.MessageRepository;
 import com.chat_socket.repository.ParticipantRepository;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -33,7 +33,7 @@ class SocketPublisherTest {
     private static final UUID C = UUID.fromString("00000000-0000-0000-0000-00000000c001");
     private static final UUID U1 = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private static final UUID U2 = UUID.fromString("00000000-0000-0000-0000-000000000002");
-    private static final LocalDateTime AT = LocalDateTime.of(2026, 1, 1, 12, 0);
+    private static final Instant AT = Instant.parse("2026-01-01T12:00:00Z");
     private static final MessageDto MESSAGE =
             new MessageDto(UUID.randomUUID(), C, U1, "hi", null, MessageType.TEXT, AT, AT);
 
@@ -145,14 +145,14 @@ class SocketPublisherTest {
 
     @Test
     void publishConversationSeen_emitsSeenTopicAndUpdateQueue() {
-        publisher.publishConversationSeenAfterCommit(C, U1, MESSAGE, AT, AT.plusMinutes(1));
+        publisher.publishConversationSeenAfterCommit(C, U1, MESSAGE, AT, AT.plusSeconds(60));
 
         ArgumentCaptor<ConversationSeenEvent> seen = ArgumentCaptor.forClass(ConversationSeenEvent.class);
         verify(socketEmitter).emit(eq("/conversations/" + C + "/seen"), seen.capture());
         assertThat(seen.getValue().eventType()).isEqualTo("conversation.seen");
         assertThat(seen.getValue().seenByUserId()).isEqualTo(U1);
         assertThat(seen.getValue().lastReadMessageId()).isEqualTo(MESSAGE.id());
-        assertThat(seen.getValue().lastReadAt()).isEqualTo(AT.plusMinutes(1));
+        assertThat(seen.getValue().lastReadAt()).isEqualTo(AT.plusSeconds(60));
         verify(socketEmitter).emitTo(eq("/queue/conversations"), any(ConversationEvent.class), eq(U1));
     }
 }
