@@ -64,14 +64,8 @@ public class ParticipantEntity {
     @Column(name = "left_at")
     private Instant leftAt;
 
-    @Column(name = "archived_at")
-    private Instant archivedAt;
-
     @Column(name = "deleted_at")
     private Instant deletedAt;
-
-    @Column(name = "muted_until")
-    private Instant mutedUntil;
 
     public boolean isActive() {
         return leftAt == null && deletedAt == null;
