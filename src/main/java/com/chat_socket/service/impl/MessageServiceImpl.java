@@ -4,6 +4,7 @@ import com.chat_socket.dto.BaseResponse;
 import com.chat_socket.dto.DirectMessageRequest;
 import com.chat_socket.dto.GroupMessageRequest;
 import com.chat_socket.dto.MessageDto;
+import com.chat_socket.dto.UpdateMessageRequest;
 import com.chat_socket.entity.ConversationEntity;
 import com.chat_socket.entity.MessageEntity;
 import com.chat_socket.entity.ParticipantEntity;
@@ -94,11 +95,49 @@ public class MessageServiceImpl implements MessageService {
         return new BaseResponse<>(messageDto, "Message sent successfully.", HttpStatus.CREATED.value());
     }
 
+    @Override
+    @Transactional
+    public BaseResponse<MessageDto> updateMessage(UUID messageId, UpdateMessageRequest request) {
+        UUID currentUserId = Security.getCurrentUser().id();
+        MessageEntity message = getOwnMessageOrThrow(messageId, currentUserId, "You can only edit your own messages.");
+        if (message.getType() != MessageType.TEXT) throw new BadRequestException("Only text messages can be edited.");
+
+        message.setContent(request.content().trim());
+        message = messageRepository.save(message);
+        MessageDto messageDto = messageMapper.toDto(message);
+
+        UUID conversationId = message.getConversation().getId();
+        socketPublisher.publishMessageUpdatedAfterCommit(conversationId, messageDto);
+        if (isLastMessage(message)) publishConversationUpdated(conversationId);
+
+        return new BaseResponse<>(messageDto, "Message updated successfully.", HttpStatus.OK.value());
+    }
+
     private void publishMessageCreated(ConversationEntity conversation, MessageDto messageDto) {
         ConversationEntity updatedConversation = conversationRepository
                 .findWithDetails(conversation.getId())
                 .orElseThrow(() -> new NotFoundException("Conversation not found."));
         socketPublisher.publishMessageCreatedAfterCommit(updatedConversation, messageDto);
+    }
+
+    private MessageEntity getOwnMessageOrThrow(UUID messageId, UUID userId, String forbiddenMessage) {
+        MessageEntity message = messageRepository
+                .findByIdAndDeletedFalse(messageId)
+                .orElseThrow(() -> new NotFoundException("Message not found."));
+        if (!message.getSender().getId().equals(userId)) throw new ForbiddenException(forbiddenMessage);
+        return message;
+    }
+
+    private static boolean isLastMessage(MessageEntity message) {
+        MessageEntity last = message.getConversation().getLastMessage();
+        return last != null && last.getId().equals(message.getId());
+    }
+
+    private void publishConversationUpdated(UUID conversationId) {
+        ConversationEntity conversation = conversationRepository
+                .findWithDetails(conversationId)
+                .orElseThrow(() -> new NotFoundException("Conversation not found."));
+        socketPublisher.publishConversationUpdatedAfterCommit(conversation);
     }
 
     private static void validateContent(String content, MessageType type, String attachmentUrl) {

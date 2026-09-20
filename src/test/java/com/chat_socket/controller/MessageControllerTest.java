@@ -2,6 +2,7 @@ package com.chat_socket.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -10,6 +11,7 @@ import com.chat_socket.config.GlobalExceptionHandler;
 import com.chat_socket.dto.BaseResponse;
 import com.chat_socket.dto.DirectMessageRequest;
 import com.chat_socket.dto.GroupMessageRequest;
+import com.chat_socket.dto.UpdateMessageRequest;
 import com.chat_socket.exception.ForbiddenException;
 import com.chat_socket.service.MessageService;
 import java.util.UUID;
@@ -91,5 +93,24 @@ class MessageControllerTest {
         assertThat(guard).isNotNull();
         assertThat(guard.value())
                 .isEqualTo("@messageDirectPermission.canSendDirect(T(java.util.List).of(#request.recipientId()))");
+    }
+
+    @Test
+    void updateMessage_blankContent_returns400() throws Exception {
+        mockMvc.perform(patch("/v1/message/{id}", ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\" \"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void updateMessage_returns200() throws Exception {
+        when(messageService.updateMessage(ID, new UpdateMessageRequest("edited")))
+                .thenReturn(new BaseResponse<>(null, "Message updated successfully.", 200));
+
+        mockMvc.perform(patch("/v1/message/{id}", ID)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"content\":\"edited\"}"))
+                .andExpect(status().isOk());
     }
 }

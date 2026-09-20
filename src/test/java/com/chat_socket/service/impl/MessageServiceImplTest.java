@@ -12,6 +12,7 @@ import com.chat_socket.dto.BaseResponse;
 import com.chat_socket.dto.DirectMessageRequest;
 import com.chat_socket.dto.GroupMessageRequest;
 import com.chat_socket.dto.MessageDto;
+import com.chat_socket.dto.UpdateMessageRequest;
 import com.chat_socket.entity.ConversationEntity;
 import com.chat_socket.entity.MessageEntity;
 import com.chat_socket.entity.ParticipantEntity;
@@ -20,6 +21,7 @@ import com.chat_socket.enums.ConversationType;
 import com.chat_socket.enums.MessageType;
 import com.chat_socket.enums.ParticipantRole;
 import com.chat_socket.exception.BadRequestException;
+import com.chat_socket.exception.ForbiddenException;
 import com.chat_socket.exception.NotFoundException;
 import com.chat_socket.mapper.MessageMapper;
 import com.chat_socket.repository.ConversationRepository;
@@ -229,5 +231,71 @@ class MessageServiceImplTest {
         assertThat(conversation.getLastMessage().getType()).isEqualTo(MessageType.IMAGE);
         assertThat(conversation.getLastMessage().getAttachmentUrl()).isEqualTo("http://file");
         verify(socketPublisher).publishMessageCreatedAfterCommit(conversation, dto);
+    }
+
+    // ---------- updateMessage ----------
+
+    @Test
+    void updateMessage_notSender_throwsForbidden() {
+        TestFixtures.authenticateAs(BIG);
+        ConversationEntity conversation = TestFixtures.conversation(CONVERSATION_ID, ConversationType.GROUP);
+        MessageEntity message = TestFixtures.message(UUID.randomUUID(), conversation, TestFixtures.user(SMALL));
+        when(messageRepository.findByIdAndDeletedFalse(message.getId())).thenReturn(Optional.of(message));
+
+        assertThatThrownBy(() -> service.updateMessage(message.getId(), new UpdateMessageRequest("edited")))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("You can only edit your own messages.");
+    }
+
+    @Test
+    void updateMessage_imageMessage_throwsBadRequest() {
+        TestFixtures.authenticateAs(SMALL);
+        ConversationEntity conversation = TestFixtures.conversation(CONVERSATION_ID, ConversationType.GROUP);
+        MessageEntity message = TestFixtures.message(UUID.randomUUID(), conversation, TestFixtures.user(SMALL));
+        message.setType(MessageType.IMAGE);
+        when(messageRepository.findByIdAndDeletedFalse(message.getId())).thenReturn(Optional.of(message));
+
+        assertThatThrownBy(() -> service.updateMessage(message.getId(), new UpdateMessageRequest("edited")))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Only text messages can be edited.");
+    }
+
+    @Test
+    void updateMessage_success_savesPublishesAndRefreshesConversationWhenLast() {
+        TestFixtures.authenticateAs(SMALL);
+        ConversationEntity conversation = TestFixtures.conversation(CONVERSATION_ID, ConversationType.GROUP);
+        MessageEntity message = TestFixtures.message(UUID.randomUUID(), conversation, TestFixtures.user(SMALL));
+        conversation.setLastMessage(message);
+        MessageDto dto =
+                new MessageDto(message.getId(), CONVERSATION_ID, SMALL, "edited", null, MessageType.TEXT, null, null);
+        when(messageRepository.findByIdAndDeletedFalse(message.getId())).thenReturn(Optional.of(message));
+        when(messageRepository.save(message)).thenReturn(message);
+        when(messageMapper.toDto(message)).thenReturn(dto);
+        when(conversationRepository.findWithDetails(CONVERSATION_ID)).thenReturn(Optional.of(conversation));
+
+        BaseResponse<MessageDto> response =
+                service.updateMessage(message.getId(), new UpdateMessageRequest(" edited "));
+
+        assertThat(response.status()).isEqualTo(200);
+        assertThat(message.getContent()).isEqualTo("edited");
+        verify(socketPublisher).publishMessageUpdatedAfterCommit(CONVERSATION_ID, dto);
+        verify(socketPublisher).publishConversationUpdatedAfterCommit(conversation);
+    }
+
+    @Test
+    void updateMessage_notLast_doesNotRefreshConversation() {
+        TestFixtures.authenticateAs(SMALL);
+        ConversationEntity conversation = TestFixtures.conversation(CONVERSATION_ID, ConversationType.GROUP);
+        MessageEntity message = TestFixtures.message(UUID.randomUUID(), conversation, TestFixtures.user(SMALL));
+        conversation.setLastMessage(TestFixtures.message(UUID.randomUUID(), conversation, TestFixtures.user(SMALL)));
+        when(messageRepository.findByIdAndDeletedFalse(message.getId())).thenReturn(Optional.of(message));
+        when(messageRepository.save(message)).thenReturn(message);
+        when(messageMapper.toDto(message))
+                .thenReturn(new MessageDto(
+                        message.getId(), CONVERSATION_ID, SMALL, "x", null, MessageType.TEXT, null, null));
+
+        service.updateMessage(message.getId(), new UpdateMessageRequest("x"));
+
+        verify(socketPublisher, never()).publishConversationUpdatedAfterCommit(any());
     }
 }
