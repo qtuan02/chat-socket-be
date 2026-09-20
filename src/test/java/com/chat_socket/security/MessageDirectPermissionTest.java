@@ -57,8 +57,8 @@ class MessageDirectPermissionTest {
 
     @Test
     void canCreateConversation_group_allFriends_isAllowed() {
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(true);
-        when(friendRepository.existsByUserAIdAndUserBId(BIG, THIRD)).thenReturn(true);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(true);
+        when(friendRepository.existsFriendship(BIG, THIRD)).thenReturn(true);
 
         assertThat(permission.canCreateConversation(
                         new ConversationRequest(ConversationType.GROUP, "g", List.of(SMALL, THIRD))))
@@ -67,8 +67,8 @@ class MessageDirectPermissionTest {
 
     @Test
     void canCreateConversation_group_someNotFriends_throwsWithOffenders() {
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(true);
-        when(friendRepository.existsByUserAIdAndUserBId(BIG, THIRD)).thenReturn(false);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(true);
+        when(friendRepository.existsFriendship(BIG, THIRD)).thenReturn(false);
 
         assertThatThrownBy(() -> permission.canCreateConversation(
                         new ConversationRequest(ConversationType.GROUP, "g", List.of(SMALL, THIRD))))

@@ -112,7 +112,7 @@ class ConversationServiceImplTest {
         ConversationEntity conversation = TestFixtures.conversation(C, ConversationType.GROUP);
         ParticipantEntity me = TestFixtures.participant(conversation, TestFixtures.user(BIG), role);
         when(conversationRepository.findById(C)).thenReturn(Optional.of(conversation));
-        when(participantRepository.findByIdConversationIdAndIdUserId(C, BIG)).thenReturn(Optional.of(me));
+        when(participantRepository.findActiveParticipant(C, BIG)).thenReturn(Optional.of(me));
         return me;
     }
 
@@ -343,15 +343,7 @@ class ConversationServiceImplTest {
     void markAsSeen_notParticipant_throwsForbidden() {
         when(conversationRepository.findById(C))
                 .thenReturn(Optional.of(TestFixtures.conversation(C, ConversationType.GROUP)));
-        when(participantRepository.findByIdConversationIdAndIdUserId(C, BIG)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> service.markAsSeen(C)).isInstanceOf(ForbiddenException.class);
-    }
-
-    @Test
-    void markAsSeen_leftParticipant_throwsForbidden() { // moves to ParticipantRepositoryDefaultsTest in Task 11
-        ParticipantEntity me = stubGroupWithMe(ParticipantRole.MEMBER);
-        me.setLeftAt(TestFixtures.FIXED_TIME);
+        when(participantRepository.findActiveParticipant(C, BIG)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.markAsSeen(C)).isInstanceOf(ForbiddenException.class);
     }
@@ -475,13 +467,13 @@ class ConversationServiceImplTest {
         BaseResponse<ConversationDto> response = service.addGroupMembers(C, new GroupMembersRequest(List.of(BIG)));
 
         assertThat(response.message()).isEqualTo("Members already in group.");
-        verify(friendRepository, never()).existsByUserAIdAndUserBId(any(), any());
+        verify(friendRepository, never()).existsFriendship(any(), any());
     }
 
     @Test
     void addGroupMembers_notFriend_throwsFriendPermissionWithOffendingIds() {
         stubGroupWithMe(ParticipantRole.MEMBER);
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(false);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(false);
 
         assertThatThrownBy(() -> service.addGroupMembers(C, new GroupMembersRequest(List.of(SMALL))))
                 .isInstanceOfSatisfying(
@@ -492,7 +484,7 @@ class ConversationServiceImplTest {
     @Test
     void addGroupMembers_unknownUser_throwsNotFound() {
         stubGroupWithMe(ParticipantRole.MEMBER);
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(true);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(true);
         when(userRepository.findAllById(Set.of(SMALL))).thenReturn(List.of());
 
         assertThatThrownBy(() -> service.addGroupMembers(C, new GroupMembersRequest(List.of(SMALL))))
@@ -503,7 +495,7 @@ class ConversationServiceImplTest {
     void addGroupMembers_newMember_createsParticipantAndPublishes() {
         ParticipantEntity me = stubGroupWithMe(ParticipantRole.MEMBER);
         UserEntity other = TestFixtures.user(SMALL);
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(true);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(true);
         when(userRepository.findAllById(Set.of(SMALL))).thenReturn(List.of(other));
         when(participantRepository.findByConversationIdAndIdUserIdIn(C, Set.of(SMALL)))
                 .thenReturn(List.of());
@@ -528,7 +520,7 @@ class ConversationServiceImplTest {
         UserEntity other = TestFixtures.user(SMALL);
         ParticipantEntity left = TestFixtures.participant(me.getConversation(), other, ParticipantRole.ADMIN);
         left.setLeftAt(TestFixtures.FIXED_TIME);
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(true);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(true);
         when(userRepository.findAllById(Set.of(SMALL))).thenReturn(List.of(other));
         when(participantRepository.findByConversationIdAndIdUserIdIn(C, Set.of(SMALL)))
                 .thenReturn(List.of(left));
@@ -570,7 +562,7 @@ class ConversationServiceImplTest {
     @Test
     void removeGroupMember_targetNotInGroup_throwsNotFound() {
         stubGroupWithMe(ParticipantRole.ADMIN);
-        when(participantRepository.findByIdConversationIdAndIdUserId(C, SMALL)).thenReturn(Optional.empty());
+        when(participantRepository.findActiveParticipant(C, SMALL)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.removeGroupMember(C, SMALL))
                 .isInstanceOf(NotFoundException.class)
@@ -582,7 +574,7 @@ class ConversationServiceImplTest {
         ParticipantEntity me = stubGroupWithMe(ParticipantRole.ADMIN);
         ParticipantEntity target =
                 TestFixtures.participant(me.getConversation(), TestFixtures.user(SMALL), ParticipantRole.ADMIN);
-        when(participantRepository.findByIdConversationIdAndIdUserId(C, SMALL)).thenReturn(Optional.of(target));
+        when(participantRepository.findActiveParticipant(C, SMALL)).thenReturn(Optional.of(target));
 
         assertThatThrownBy(() -> service.removeGroupMember(C, SMALL))
                 .isInstanceOf(BadRequestException.class)
@@ -594,7 +586,7 @@ class ConversationServiceImplTest {
         ParticipantEntity me = stubGroupWithMe(ParticipantRole.ADMIN);
         ParticipantEntity target =
                 TestFixtures.participant(me.getConversation(), TestFixtures.user(SMALL), ParticipantRole.MEMBER);
-        when(participantRepository.findByIdConversationIdAndIdUserId(C, SMALL)).thenReturn(Optional.of(target));
+        when(participantRepository.findActiveParticipant(C, SMALL)).thenReturn(Optional.of(target));
         stubDetailsAndMapper(me.getConversation());
 
         BaseResponse<ConversationDto> response = service.removeGroupMember(C, SMALL);

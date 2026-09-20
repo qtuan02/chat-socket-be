@@ -51,7 +51,7 @@ class GroupPermissionTest {
         ConversationEntity conversation = TestFixtures.conversation(C, ConversationType.GROUP);
         ParticipantEntity me = TestFixtures.participant(conversation, TestFixtures.user(ME), role);
         when(conversationRepository.findById(C)).thenReturn(Optional.of(conversation));
-        when(participantRepository.findByIdConversationIdAndIdUserId(C, ME)).thenReturn(Optional.of(me));
+        when(participantRepository.findActiveParticipant(C, ME)).thenReturn(Optional.of(me));
         return me;
     }
 
@@ -81,14 +81,7 @@ class GroupPermissionTest {
     void notParticipant_throwsForbidden() {
         when(conversationRepository.findById(C))
                 .thenReturn(Optional.of(TestFixtures.conversation(C, ConversationType.GROUP)));
-        when(participantRepository.findByIdConversationIdAndIdUserId(C, ME)).thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> permission.canManageGroup(C)).isInstanceOf(ForbiddenException.class);
-    }
-
-    @Test
-    void leftParticipant_throwsForbidden() { // moves to ParticipantRepositoryDefaultsTest in Task 11
-        stubGroupWithMe(ParticipantRole.ADMIN).setLeftAt(TestFixtures.FIXED_TIME);
+        when(participantRepository.findActiveParticipant(C, ME)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> permission.canManageGroup(C)).isInstanceOf(ForbiddenException.class);
     }

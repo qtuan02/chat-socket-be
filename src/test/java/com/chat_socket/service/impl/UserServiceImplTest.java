@@ -165,7 +165,7 @@ class UserServiceImplTest {
         when(friendRequestRepository.findFriendRequestsBetweenUserAndUsers(
                         BIG, List.of(SMALL), FriendRequestStatus.PENDING))
                 .thenReturn(List.of());
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(true);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(true);
 
         service.getUserInfo(SMALL);
 
@@ -182,7 +182,7 @@ class UserServiceImplTest {
         when(friendRequestRepository.findFriendRequestsBetweenUserAndUsers(
                         BIG, List.of(SMALL), FriendRequestStatus.PENDING))
                 .thenReturn(List.of(pending));
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(false);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(false);
 
         service.getUserInfo(SMALL);
 
@@ -199,7 +199,7 @@ class UserServiceImplTest {
         when(friendRequestRepository.findFriendRequestsBetweenUserAndUsers(
                         BIG, List.of(SMALL), FriendRequestStatus.PENDING))
                 .thenReturn(List.of(pending));
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(false);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(false);
 
         service.getUserInfo(SMALL);
 
@@ -214,7 +214,7 @@ class UserServiceImplTest {
         when(friendRequestRepository.findFriendRequestsBetweenUserAndUsers(
                         BIG, List.of(SMALL), FriendRequestStatus.PENDING))
                 .thenReturn(List.of());
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(false);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(false);
 
         service.getUserInfo(SMALL);
 

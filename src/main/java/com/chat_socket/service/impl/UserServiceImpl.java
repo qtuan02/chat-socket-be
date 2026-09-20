@@ -5,7 +5,6 @@ import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.dto.UpdateUserRequest;
 import com.chat_socket.dto.UserInfoDto;
-import com.chat_socket.dto.UserPair;
 import com.chat_socket.dto.UserProfileDto;
 import com.chat_socket.dto.UserSearchDto;
 import com.chat_socket.dto.UserSecurity;
@@ -113,8 +112,8 @@ public class UserServiceImpl implements UserService {
         Map<UUID, FriendEntity> friendshipsByUserId =
                 friendRepository.findFriendshipsBetweenUserAndUsers(currentUser.id(), userIds).stream()
                         .collect(Collectors.toMap(
-                                friendship -> getFriendUser(friendship, currentUser.id())
-                                        .getId(),
+                                friendship ->
+                                        friendship.otherUser(currentUser.id()).getId(),
                                 Function.identity()));
         Map<UUID, FriendRequestEntity> pendingRequestsByUserId =
                 friendRequestRepository
@@ -138,9 +137,7 @@ public class UserServiceImpl implements UserService {
 
     private boolean hasFriendship(UUID currentUserId, UUID userId) {
         if (currentUserId.equals(userId)) return false;
-
-        UserPair pair = Normalize.normalizeUserPair(currentUserId, userId);
-        return friendRepository.existsByUserAIdAndUserBId(pair.userAId(), pair.userBId());
+        return friendRepository.existsFriendship(currentUserId, userId);
     }
 
     private FriendRequestEntity findPendingRequest(UUID currentUserId, UUID userId) {
@@ -151,10 +148,6 @@ public class UserServiceImpl implements UserService {
                 .stream()
                 .findFirst()
                 .orElse(null);
-    }
-
-    private UserEntity getFriendUser(FriendEntity friendship, UUID currentUserId) {
-        return friendship.getUserA().getId().equals(currentUserId) ? friendship.getUserB() : friendship.getUserA();
     }
 
     private FriendStatus resolveFriendStatus(

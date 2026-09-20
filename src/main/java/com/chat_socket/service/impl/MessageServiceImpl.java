@@ -21,7 +21,6 @@ import com.chat_socket.repository.ParticipantRepository;
 import com.chat_socket.repository.UserRepository;
 import com.chat_socket.service.MessageService;
 import com.chat_socket.socket.SocketPublisher;
-import com.chat_socket.utils.Normalize;
 import com.chat_socket.utils.Security;
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -167,7 +166,7 @@ public class MessageServiceImpl implements MessageService {
         UserEntity recipient =
                 userRepository.findById(recipientId).orElseThrow(() -> new NotFoundException("Recipient not found."));
 
-        UserPair pair = Normalize.normalizeUserPair(senderId, recipientId);
+        UserPair pair = UserPair.of(senderId, recipientId);
         return conversationRepository
                 .findDirectConversation(ConversationType.DIRECT, pair.userAId(), pair.userBId())
                 .orElseGet(() -> createDirectConversation(sender, recipient));

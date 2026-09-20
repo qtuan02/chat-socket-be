@@ -34,11 +34,8 @@ public class GroupPermission {
 
         UserSecurity currentUser = Security.getCurrentUser();
         ParticipantEntity participant = participantRepository
-                .findByIdConversationIdAndIdUserId(conversationId, currentUser.id())
+                .findActiveParticipant(conversationId, currentUser.id())
                 .orElseThrow(() -> new ForbiddenException("You are not a participant of this conversation."));
-
-        if (participant.getLeftAt() != null || participant.getDeletedAt() != null)
-            throw new ForbiddenException("You are not a participant of this conversation.");
 
         if (participant.getRole() != ParticipantRole.ADMIN)
             throw new ForbiddenException("Only admins can manage this group.");

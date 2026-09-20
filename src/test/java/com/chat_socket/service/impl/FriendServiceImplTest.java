@@ -132,7 +132,7 @@ class FriendServiceImplTest {
         TestFixtures.authenticateAs(BIG);
         when(userRepository.findById(BIG)).thenReturn(Optional.of(TestFixtures.user(BIG)));
         when(userRepository.findById(SMALL)).thenReturn(Optional.of(TestFixtures.user(SMALL)));
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(true);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(true);
 
         BaseResponse<String> response = service.sendFriendRequest(new FriendSendRequest(SMALL, null));
 
@@ -145,7 +145,7 @@ class FriendServiceImplTest {
         TestFixtures.authenticateAs(BIG);
         when(userRepository.findById(BIG)).thenReturn(Optional.of(TestFixtures.user(BIG)));
         when(userRepository.findById(SMALL)).thenReturn(Optional.of(TestFixtures.user(SMALL)));
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(false);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(false);
         when(friendRequestRepository.existsBetweenUsersWithStatus(BIG, SMALL, FriendRequestStatus.PENDING))
                 .thenReturn(true);
 
@@ -164,7 +164,7 @@ class FriendServiceImplTest {
         FriendRequestEntity entity = new FriendRequestEntity();
         when(userRepository.findById(BIG)).thenReturn(Optional.of(from));
         when(userRepository.findById(SMALL)).thenReturn(Optional.of(to));
-        when(friendRepository.existsByUserAIdAndUserBId(SMALL, BIG)).thenReturn(false);
+        when(friendRepository.existsFriendship(BIG, SMALL)).thenReturn(false);
         when(friendRequestRepository.existsBetweenUsersWithStatus(BIG, SMALL, FriendRequestStatus.PENDING))
                 .thenReturn(false);
         when(friendRequestMapper.toEntity(request)).thenReturn(entity);

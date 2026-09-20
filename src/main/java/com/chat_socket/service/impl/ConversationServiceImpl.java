@@ -30,7 +30,6 @@ import com.chat_socket.repository.ParticipantRepository;
 import com.chat_socket.repository.UserRepository;
 import com.chat_socket.service.ConversationService;
 import com.chat_socket.socket.SocketPublisher;
-import com.chat_socket.utils.Normalize;
 import com.chat_socket.utils.PaginationUtils;
 import com.chat_socket.utils.Security;
 import java.time.LocalDateTime;
@@ -159,12 +158,7 @@ public class ConversationServiceImpl implements ConversationService {
         ConversationEntity conversation = conversationRepository
                 .findById(conversationId)
                 .orElseThrow(() -> new NotFoundException("Conversation not found."));
-        ParticipantEntity participant = participantRepository
-                .findByIdConversationIdAndIdUserId(conversationId, currentUser.id())
-                .orElseThrow(() -> new ForbiddenException("You are not a participant of this conversation."));
-
-        if (participant.getLeftAt() != null || participant.getDeletedAt() != null)
-            throw new ForbiddenException("You are not a participant of this conversation.");
+        ParticipantEntity participant = getActiveParticipantOrThrow(conversationId, currentUser.id());
 
         MessageEntity lastMessage = conversation.getLastMessage();
         if (lastMessage == null) return new BaseResponse<>(null, "No messages to mark as seen.", HttpStatus.OK.value());
@@ -276,7 +270,7 @@ public class ConversationServiceImpl implements ConversationService {
                 continue;
             }
 
-            if (participant.getLeftAt() != null || participant.getDeletedAt() != null) {
+            if (!participant.isActive()) {
                 participant.setLeftAt(null);
                 participant.setDeletedAt(null);
                 participant.setRole(ParticipantRole.MEMBER);
@@ -314,10 +308,8 @@ public class ConversationServiceImpl implements ConversationService {
             throw new BadRequestException("You cannot remove yourself. Use leave endpoint instead.");
 
         ParticipantEntity targetParticipant = participantRepository
-                .findByIdConversationIdAndIdUserId(conversationId, memberId)
+                .findActiveParticipant(conversationId, memberId)
                 .orElseThrow(() -> new NotFoundException("Participant not found."));
-        if (targetParticipant.getLeftAt() != null || targetParticipant.getDeletedAt() != null)
-            throw new NotFoundException("Participant not found.");
         if (targetParticipant.getRole() == ParticipantRole.ADMIN)
             throw new BadRequestException("You cannot remove an admin from this group.");
 
@@ -373,14 +365,9 @@ public class ConversationServiceImpl implements ConversationService {
     }
 
     private ParticipantEntity getActiveParticipantOrThrow(UUID conversationId, UUID userId) {
-        ParticipantEntity participant = participantRepository
-                .findByIdConversationIdAndIdUserId(conversationId, userId)
+        return participantRepository
+                .findActiveParticipant(conversationId, userId)
                 .orElseThrow(() -> new ForbiddenException("You are not a participant of this conversation."));
-
-        if (participant.getLeftAt() != null || participant.getDeletedAt() != null)
-            throw new ForbiddenException("You are not a participant of this conversation.");
-
-        return participant;
     }
 
     private ParticipantEntity getActiveAdminParticipantOrThrow(UUID conversationId, UUID userId) {
@@ -396,8 +383,7 @@ public class ConversationServiceImpl implements ConversationService {
         for (UUID memberId : memberIds) {
             if (memberId == null) continue;
 
-            UserPair pair = Normalize.normalizeUserPair(currentUserId, memberId);
-            if (!friendRepository.existsByUserAIdAndUserBId(pair.userAId(), pair.userBId())) {
+            if (!friendRepository.existsFriendship(currentUserId, memberId)) {
                 notFriends.add(memberId);
             }
         }
@@ -435,7 +421,7 @@ public class ConversationServiceImpl implements ConversationService {
         UserEntity participant =
                 userRepository.findById(participantId).orElseThrow(() -> new NotFoundException("Member not found."));
 
-        UserPair pair = Normalize.normalizeUserPair(currentUserId, participantId);
+        UserPair pair = UserPair.of(currentUserId, participantId);
         ConversationEntity conversation = conversationRepository
                 .findDirectConversation(ConversationType.DIRECT, pair.userAId(), pair.userBId())
                 .orElseGet(() -> createDirectConversation(currentUser, participant, pair));

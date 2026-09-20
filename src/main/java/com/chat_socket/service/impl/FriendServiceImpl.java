@@ -64,7 +64,7 @@ public class FriendServiceImpl implements FriendService {
                 userId, usernameSearch, normalizedNameSearch, page.pageRequest());
 
         PaginationResponse<FriendDto> result = PaginationUtils.toOffsetResponse(
-                fetchedFriendships, page, friendship -> friendMapper.toFriendDto(getFriendUser(friendship, userId)));
+                fetchedFriendships, page, friendship -> friendMapper.toFriendDto(friendship.otherUser(userId)));
 
         return new BaseResponse<>(result, "Success.", HttpStatus.OK.value());
     }
@@ -103,8 +103,7 @@ public class FriendServiceImpl implements FriendService {
         UserEntity toUser =
                 userRepository.findById(toUserId).orElseThrow(() -> new NotFoundException("User not found."));
 
-        UserPair pair = Normalize.normalizeUserPair(fromUserId, toUserId);
-        if (friendRepository.existsByUserAIdAndUserBId(pair.userAId(), pair.userBId()))
+        if (friendRepository.existsFriendship(fromUserId, toUserId))
             return new BaseResponse<>(null, "You are already friends.", HttpStatus.CONFLICT.value());
 
         boolean pendingRequestExists =
@@ -205,14 +204,10 @@ public class FriendServiceImpl implements FriendService {
         if (currentUser.id().equals(friendId))
             return new BaseResponse<>(null, "Friend not found.", HttpStatus.NOT_FOUND.value());
 
-        UserPair pair = Normalize.normalizeUserPair(currentUser.id(), friendId);
+        UserPair pair = UserPair.of(currentUser.id(), friendId);
         long deleted = friendRepository.deleteByUserAIdAndUserBId(pair.userAId(), pair.userBId());
         if (deleted == 0) return new BaseResponse<>(null, "Friend not found.", HttpStatus.NOT_FOUND.value());
 
         return new BaseResponse<>(null, null, HttpStatus.NO_CONTENT.value());
-    }
-
-    private UserEntity getFriendUser(FriendEntity friendship, UUID currentUserId) {
-        return friendship.getUserA().getId().equals(currentUserId) ? friendship.getUserB() : friendship.getUserA();
     }
 }

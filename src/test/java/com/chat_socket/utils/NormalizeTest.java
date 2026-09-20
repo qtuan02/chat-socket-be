@@ -2,20 +2,9 @@ package com.chat_socket.utils;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.chat_socket.dto.UserPair;
-import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 class NormalizeTest {
-
-    @Test
-    void normalizeUserPair_ordersBySmallerUuidStringFirst() {
-        UUID small = UUID.fromString("00000000-0000-0000-0000-000000000001");
-        UUID big = UUID.fromString("00000000-0000-0000-0000-000000000002");
-
-        assertThat(Normalize.normalizeUserPair(big, small)).isEqualTo(new UserPair(small, big));
-        assertThat(Normalize.normalizeUserPair(small, big)).isEqualTo(new UserPair(small, big));
-    }
 
     @Test
     void normalizeSearchText_stripsAccentsSpacesAndLowercases() {
