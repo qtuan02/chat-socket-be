@@ -66,4 +66,17 @@ class SecurityTest {
         assertThat(Security.getUserSecurityFromPrincipal(plain)).isNull();
         assertThat(Security.getUserSecurityFromPrincipal(null)).isNull();
     }
+
+    @Test
+    void extractBearerToken_returnsTrimmedToken() {
+        assertThat(Security.extractBearerToken("Bearer abc.def ")).isEqualTo("abc.def");
+    }
+
+    @Test
+    void extractBearerToken_missingOrWrongSchemeOrBlank_returnsNull() {
+        assertThat(Security.extractBearerToken(null)).isNull();
+        assertThat(Security.extractBearerToken("Basic abc")).isNull();
+        assertThat(Security.extractBearerToken("Bearer ")).isNull();
+        assertThat(Security.extractBearerToken("Bearer    ")).isNull();
+    }
 }

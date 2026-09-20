@@ -1,10 +1,8 @@
 package com.chat_socket.service.impl;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.chat_socket.ApplicationYaml;
-import io.jsonwebtoken.JwtException;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -20,21 +18,21 @@ class JwtServiceImplTest {
 
         String token = service.generateToken(userId);
 
-        assertThat(service.verifyAccessToken(token)).isEqualTo(userId);
+        assertThat(service.verifyAccessToken(token)).contains(userId);
     }
 
     @Test
-    void verifyAccessToken_tamperedToken_throwsJwtException() {
+    void verifyAccessToken_tamperedToken_isEmpty() {
         String token = service.generateToken(UUID.randomUUID());
         String tampered = token.substring(0, token.length() - 2) + "xx";
 
-        assertThatThrownBy(() -> service.verifyAccessToken(tampered)).isInstanceOf(JwtException.class);
+        assertThat(service.verifyAccessToken(tampered)).isEmpty();
     }
 
     @Test
-    void verifyAccessToken_garbage_throws() {
-        assertThatThrownBy(() -> service.verifyAccessToken("not-a-jwt"))
-                .isInstanceOfAny(JwtException.class, IllegalArgumentException.class);
+    void verifyAccessToken_garbage_isEmpty() {
+        assertThat(service.verifyAccessToken("not-a-jwt")).isEmpty();
+        assertThat(service.verifyAccessToken("")).isEmpty();
     }
 
     @Test

@@ -8,7 +8,6 @@ import com.chat_socket.dto.UserSecurity;
 import com.chat_socket.repository.UserRepository;
 import com.chat_socket.service.JwtService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.jsonwebtoken.JwtException;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.AfterEach;
@@ -95,7 +94,7 @@ class SecurityFilterTest {
         MockHttpServletRequest request = request("GET", "/api/v1/user/me");
         request.addHeader("Authorization", "Bearer bad");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        when(jwtService.verifyAccessToken("bad")).thenThrow(new JwtException("bad"));
+        when(jwtService.verifyAccessToken("bad")).thenReturn(Optional.empty());
 
         filter.doFilter(request, response, new MockFilterChain());
 
@@ -109,7 +108,7 @@ class SecurityFilterTest {
         MockHttpServletRequest request = request("GET", "/api/v1/user/me");
         request.addHeader("Authorization", "Bearer good");
         MockHttpServletResponse response = new MockHttpServletResponse();
-        when(jwtService.verifyAccessToken("good")).thenReturn(userId);
+        when(jwtService.verifyAccessToken("good")).thenReturn(Optional.of(userId));
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         filter.doFilter(request, response, new MockFilterChain());
@@ -125,7 +124,7 @@ class SecurityFilterTest {
         request.addHeader("Authorization", "Bearer good");
         MockHttpServletResponse response = new MockHttpServletResponse();
         MockFilterChain chain = new MockFilterChain();
-        when(jwtService.verifyAccessToken("good")).thenReturn(userId);
+        when(jwtService.verifyAccessToken("good")).thenReturn(Optional.of(userId));
         when(userRepository.findById(userId)).thenReturn(Optional.of(TestFixtures.user(userId)));
 
         filter.doFilter(request, response, chain);

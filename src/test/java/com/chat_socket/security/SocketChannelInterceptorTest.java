@@ -14,7 +14,6 @@ import com.chat_socket.repository.ParticipantRepository;
 import com.chat_socket.repository.UserRepository;
 import com.chat_socket.service.JwtService;
 import com.chat_socket.utils.Security;
-import io.jsonwebtoken.JwtException;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -74,7 +73,7 @@ class SocketChannelInterceptorTest {
     void connect_invalidToken_throwsForbidden() {
         StompHeaderAccessor accessor = accessor(StompCommand.CONNECT);
         accessor.setNativeHeader("Authorization", "Bearer bad");
-        when(jwtService.verifyAccessToken("bad")).thenThrow(new JwtException("bad"));
+        when(jwtService.verifyAccessToken("bad")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> interceptor.preSend(message(accessor), channel))
                 .isInstanceOf(ForbiddenException.class)
@@ -87,7 +86,7 @@ class SocketChannelInterceptorTest {
         UserEntity user = TestFixtures.user(userId);
         StompHeaderAccessor accessor = accessor(StompCommand.CONNECT);
         accessor.setNativeHeader("Authorization", "Bearer good");
-        when(jwtService.verifyAccessToken("good")).thenReturn(userId);
+        when(jwtService.verifyAccessToken("good")).thenReturn(Optional.of(userId));
         when(userRepository.findById(userId)).thenReturn(Optional.of(user));
 
         interceptor.preSend(message(accessor), channel);

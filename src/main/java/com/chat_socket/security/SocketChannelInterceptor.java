@@ -23,7 +23,6 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class SocketChannelInterceptor implements ChannelInterceptor {
-    private static final String BEARER_PREFIX = "Bearer ";
     private static final String CONVERSATION_MESSAGE_DESTINATION_PREFIX =
             SocketChannel.TOPIC + SocketChannel.CONVERSATION + "/";
     private static final String CONVERSATION_MESSAGE_DESTINATION_SUFFIX = SocketChannel.MESSAGE;
@@ -56,16 +55,12 @@ public class SocketChannelInterceptor implements ChannelInterceptor {
     }
 
     private void authenticateConnect(StompHeaderAccessor accessor) {
-        String authorizationHeader = accessor.getFirstNativeHeader(HttpHeaders.AUTHORIZATION);
-        if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX))
-            throw new NotFoundException("Token not found.");
+        String accessToken = Security.extractBearerToken(accessor.getFirstNativeHeader(HttpHeaders.AUTHORIZATION));
+        if (accessToken == null) throw new NotFoundException("Token not found.");
 
-        String accessToken =
-                authorizationHeader.substring(BEARER_PREFIX.length()).trim();
-        if (accessToken.isBlank()) throw new NotFoundException("Token not found.");
-
-        UUID userId = Security.getUserIdFromAccessToken(jwtService, accessToken);
-        if (userId == null) throw new ForbiddenException("Token expired or invalid.");
+        UUID userId = jwtService
+                .verifyAccessToken(accessToken)
+                .orElseThrow(() -> new ForbiddenException("Token expired or invalid."));
 
         UserEntity user =
                 userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User does not exist."));
