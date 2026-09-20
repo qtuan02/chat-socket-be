@@ -3,15 +3,14 @@ package com.chat_socket.service.impl;
 import com.chat_socket.dto.BaseResponse;
 import com.chat_socket.dto.MessageDto;
 import com.chat_socket.dto.MessageRequest;
-import com.chat_socket.dto.UserPair;
 import com.chat_socket.dto.UserSecurity;
 import com.chat_socket.entity.ConversationEntity;
 import com.chat_socket.entity.MessageEntity;
 import com.chat_socket.entity.ParticipantEntity;
-import com.chat_socket.entity.ParticipantIdEntity;
 import com.chat_socket.entity.UserEntity;
 import com.chat_socket.enums.ConversationType;
 import com.chat_socket.enums.MessageType;
+import com.chat_socket.exception.BadRequestException;
 import com.chat_socket.exception.ForbiddenException;
 import com.chat_socket.exception.NotFoundException;
 import com.chat_socket.mapper.MessageMapper;
@@ -19,6 +18,7 @@ import com.chat_socket.repository.ConversationRepository;
 import com.chat_socket.repository.MessageRepository;
 import com.chat_socket.repository.ParticipantRepository;
 import com.chat_socket.repository.UserRepository;
+import com.chat_socket.service.ConversationService;
 import com.chat_socket.service.MessageService;
 import com.chat_socket.socket.SocketPublisher;
 import com.chat_socket.utils.Security;
@@ -36,6 +36,7 @@ public class MessageServiceImpl implements MessageService {
     private final UserRepository userRepository;
     private final MessageMapper messageMapper;
     private final SocketPublisher socketPublisher;
+    private final ConversationService conversationService;
 
     public MessageServiceImpl(
             ConversationRepository conversationRepository,
@@ -43,13 +44,15 @@ public class MessageServiceImpl implements MessageService {
             ParticipantRepository participantRepository,
             UserRepository userRepository,
             MessageMapper messageMapper,
-            SocketPublisher socketPublisher) {
+            SocketPublisher socketPublisher,
+            ConversationService conversationService) {
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
         this.participantRepository = participantRepository;
         this.userRepository = userRepository;
         this.messageMapper = messageMapper;
         this.socketPublisher = socketPublisher;
+        this.conversationService = conversationService;
     }
 
     @Override
@@ -59,18 +62,17 @@ public class MessageServiceImpl implements MessageService {
         UUID senderId = currentUser.id();
 
         if (request.content() == null || request.content().isBlank())
-            return new BaseResponse<>(null, "Content is required.", HttpStatus.BAD_REQUEST.value());
+            throw new BadRequestException("Content is required.");
 
         if (request.conversationId() == null && request.recipientId() == null)
-            return new BaseResponse<>(null, "Recipient is required.", HttpStatus.BAD_REQUEST.value());
+            throw new BadRequestException("Recipient is required.");
 
         if (request.conversationId() == null && senderId.equals(request.recipientId()))
-            return new BaseResponse<>(
-                    null, "You cannot send a direct message to yourself.", HttpStatus.BAD_REQUEST.value());
+            throw new BadRequestException("You cannot send a direct message to yourself.");
 
         ConversationEntity conversation = request.conversationId() != null
                 ? getDirectConversationForSender(request.conversationId(), senderId)
-                : findOrCreateDirectConversation(senderId, request.recipientId());
+                : conversationService.findOrCreateDirectConversation(senderId, request.recipientId());
 
         UserEntity sender =
                 userRepository.findById(senderId).orElseThrow(() -> new NotFoundException("User not found."));
@@ -78,8 +80,7 @@ public class MessageServiceImpl implements MessageService {
         MessageEntity message = createMessage(conversation, sender, request);
         MessageDto messageDto = messageMapper.toDto(message);
 
-        socketPublisher.publishMessageAfterCommit(
-                conversation.getId(), messageMapper.toDto(message), conversation.getLastMessageAt());
+        socketPublisher.publishMessageAfterCommit(conversation.getId(), messageDto, conversation.getLastMessageAt());
 
         return new BaseResponse<>(messageDto, "Message sent successfully.", HttpStatus.CREATED.value());
     }
@@ -91,10 +92,9 @@ public class MessageServiceImpl implements MessageService {
         UUID senderId = currentUser.id();
 
         if (request.content() == null || request.content().isBlank())
-            return new BaseResponse<>(null, "Content is required.", HttpStatus.BAD_REQUEST.value());
+            throw new BadRequestException("Content is required.");
 
-        if (request.conversationId() == null)
-            return new BaseResponse<>(null, "Conversation is required.", HttpStatus.BAD_REQUEST.value());
+        if (request.conversationId() == null) throw new BadRequestException("Conversation is required.");
 
         ConversationEntity conversation = getGroupConversationForSender(request.conversationId(), senderId);
         UserEntity sender =
@@ -158,39 +158,6 @@ public class MessageServiceImpl implements MessageService {
             throw new ForbiddenException("You are not a participant of this conversation.");
 
         return conversation;
-    }
-
-    private ConversationEntity findOrCreateDirectConversation(UUID senderId, UUID recipientId) {
-        UserEntity sender =
-                userRepository.findById(senderId).orElseThrow(() -> new NotFoundException("User not found."));
-        UserEntity recipient =
-                userRepository.findById(recipientId).orElseThrow(() -> new NotFoundException("Recipient not found."));
-
-        UserPair pair = UserPair.of(senderId, recipientId);
-        return conversationRepository
-                .findDirectConversation(ConversationType.DIRECT, pair.userAId(), pair.userBId())
-                .orElseGet(() -> createDirectConversation(sender, recipient));
-    }
-
-    private ConversationEntity createDirectConversation(UserEntity sender, UserEntity recipient) {
-        ConversationEntity conversation = new ConversationEntity();
-        conversation.setType(ConversationType.DIRECT);
-        conversation.setCreatedBy(sender);
-        conversation.setDirectUserA(sender);
-        conversation.setDirectUserB(recipient);
-
-        conversation = conversationRepository.saveAndFlush(conversation);
-        createParticipant(conversation, sender);
-        createParticipant(conversation, recipient);
-        return conversation;
-    }
-
-    private void createParticipant(ConversationEntity conversation, UserEntity user) {
-        ParticipantEntity participant = new ParticipantEntity();
-        participant.setId(new ParticipantIdEntity(conversation.getId(), user.getId()));
-        participant.setConversation(conversation);
-        participant.setUser(user);
-        participantRepository.save(participant);
     }
 
     private void markSenderAsRead(

@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -19,6 +18,7 @@ import com.chat_socket.entity.UserEntity;
 import com.chat_socket.enums.ConversationType;
 import com.chat_socket.enums.MessageType;
 import com.chat_socket.enums.ParticipantRole;
+import com.chat_socket.exception.BadRequestException;
 import com.chat_socket.exception.ForbiddenException;
 import com.chat_socket.exception.NotFoundException;
 import com.chat_socket.mapper.MessageMapper;
@@ -26,6 +26,7 @@ import com.chat_socket.repository.ConversationRepository;
 import com.chat_socket.repository.MessageRepository;
 import com.chat_socket.repository.ParticipantRepository;
 import com.chat_socket.repository.UserRepository;
+import com.chat_socket.service.ConversationService;
 import com.chat_socket.socket.SocketPublisher;
 import java.util.Optional;
 import java.util.UUID;
@@ -62,6 +63,9 @@ class MessageServiceImplTest {
     @Mock
     SocketPublisher socketPublisher;
 
+    @Mock
+    ConversationService conversationService;
+
     MessageServiceImpl service;
 
     @BeforeEach
@@ -72,7 +76,8 @@ class MessageServiceImplTest {
                 participantRepository,
                 userRepository,
                 messageMapper,
-                socketPublisher);
+                socketPublisher,
+                conversationService);
     }
 
     @AfterEach
@@ -98,34 +103,30 @@ class MessageServiceImplTest {
     }
 
     @Test
-    void sendDirectMessage_blankContent_returns400() {
+    void sendDirectMessage_blankContent_throwsBadRequest() {
         TestFixtures.authenticateAs(BIG);
 
-        BaseResponse<MessageDto> response =
-                service.sendDirectMessage(new MessageRequest(SMALL, "  ", null, null, null));
-
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.message()).isEqualTo("Content is required.");
+        assertThatThrownBy(() -> service.sendDirectMessage(new MessageRequest(SMALL, "  ", null, null, null)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Content is required.");
     }
 
     @Test
-    void sendDirectMessage_noRecipientAndNoConversation_returns400() {
+    void sendDirectMessage_noRecipientAndNoConversation_throwsBadRequest() {
         TestFixtures.authenticateAs(BIG);
 
-        BaseResponse<MessageDto> response = service.sendDirectMessage(new MessageRequest(null, "hi", null, null, null));
-
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.message()).isEqualTo("Recipient is required.");
+        assertThatThrownBy(() -> service.sendDirectMessage(new MessageRequest(null, "hi", null, null, null)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Recipient is required.");
     }
 
     @Test
-    void sendDirectMessage_toSelf_returns400() {
+    void sendDirectMessage_toSelf_throwsBadRequest() {
         TestFixtures.authenticateAs(BIG);
 
-        BaseResponse<MessageDto> response = service.sendDirectMessage(new MessageRequest(BIG, "hi", null, null, null));
-
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.message()).isEqualTo("You cannot send a direct message to yourself.");
+        assertThatThrownBy(() -> service.sendDirectMessage(new MessageRequest(BIG, "hi", null, null, null)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("You cannot send a direct message to yourself.");
     }
 
     @Test
@@ -179,62 +180,38 @@ class MessageServiceImplTest {
     }
 
     @Test
-    void sendDirectMessage_byRecipientWithoutConversation_createsDirectConversationWithTwoParticipants() {
+    void sendDirectMessage_byRecipientWithoutConversation_delegatesToConversationService() {
         TestFixtures.authenticateAs(BIG);
         UserEntity sender = TestFixtures.user(BIG);
-        UserEntity recipient = TestFixtures.user(SMALL);
+        ConversationEntity conversation = TestFixtures.conversation(CONVERSATION_ID, ConversationType.DIRECT);
+        when(conversationService.findOrCreateDirectConversation(BIG, SMALL)).thenReturn(conversation);
         when(userRepository.findById(BIG)).thenReturn(Optional.of(sender));
-        when(userRepository.findById(SMALL)).thenReturn(Optional.of(recipient));
-        when(conversationRepository.findDirectConversation(ConversationType.DIRECT, SMALL, BIG))
-                .thenReturn(Optional.empty());
-        when(conversationRepository.saveAndFlush(any(ConversationEntity.class))).thenAnswer(invocation -> {
-            ConversationEntity conversation = invocation.getArgument(0);
-            conversation.setId(CONVERSATION_ID);
-            return conversation;
-        });
-        when(participantRepository.save(any(ParticipantEntity.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-        when(messageRepository.saveAndFlush(any(MessageEntity.class))).thenAnswer(invocation -> {
-            MessageEntity message = invocation.getArgument(0);
-            message.setId(MESSAGE_ID);
-            message.setCreatedAt(TestFixtures.FIXED_TIME);
-            return message;
-        });
-        when(participantRepository.findByIdConversationIdAndIdUserId(CONVERSATION_ID, BIG))
-                .thenReturn(Optional.of(TestFixtures.participant(
-                        TestFixtures.conversation(CONVERSATION_ID, ConversationType.DIRECT),
-                        sender,
-                        ParticipantRole.MEMBER)));
-        when(messageMapper.toDto(any(MessageEntity.class))).thenReturn(null);
+        MessageDto dto = stubMessagePersistence(conversation, sender);
 
         BaseResponse<MessageDto> response =
                 service.sendDirectMessage(new MessageRequest(SMALL, "hi", null, null, null));
 
         assertThat(response.status()).isEqualTo(201);
-        // 2 participants created for the new conversation + 1 save when marking sender as read
-        verify(participantRepository, times(3)).save(any(ParticipantEntity.class));
-        verify(socketPublisher).publishMessageAfterCommit(CONVERSATION_ID, null, TestFixtures.FIXED_TIME);
+        verify(conversationRepository, never()).saveAndFlush(any());
+        verify(socketPublisher).publishMessageAfterCommit(CONVERSATION_ID, dto, TestFixtures.FIXED_TIME);
     }
 
     @Test
-    void sendGroupMessage_blankContent_returns400() {
+    void sendGroupMessage_blankContent_throwsBadRequest() {
         TestFixtures.authenticateAs(BIG);
 
-        BaseResponse<MessageDto> response =
-                service.sendGroupMessage(new MessageRequest(null, "", null, CONVERSATION_ID, null));
-
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.message()).isEqualTo("Content is required.");
+        assertThatThrownBy(() -> service.sendGroupMessage(new MessageRequest(null, "", null, CONVERSATION_ID, null)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Content is required.");
     }
 
     @Test
-    void sendGroupMessage_noConversation_returns400() {
+    void sendGroupMessage_noConversation_throwsBadRequest() {
         TestFixtures.authenticateAs(BIG);
 
-        BaseResponse<MessageDto> response = service.sendGroupMessage(new MessageRequest(null, "hi", null, null, null));
-
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.message()).isEqualTo("Conversation is required.");
+        assertThatThrownBy(() -> service.sendGroupMessage(new MessageRequest(null, "hi", null, null, null)))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Conversation is required.");
     }
 
     @Test
