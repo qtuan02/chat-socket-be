@@ -196,6 +196,20 @@ class MessageServiceImplTest {
         verify(socketPublisher).publishMessageAfterCommit(CONVERSATION_ID, dto, TestFixtures.FIXED_TIME);
     }
 
+    // Ratified in spec: delegating to ConversationService changed this 404's text from
+    // "Recipient not found." to "User not found." (same status). Pin the propagation so a future
+    // wrapping/rewrapping of the exception here doesn't silently change it again.
+    @Test
+    void sendDirectMessage_byRecipientWithoutConversation_unknownRecipient_propagatesUserNotFound() {
+        TestFixtures.authenticateAs(BIG);
+        when(conversationService.findOrCreateDirectConversation(BIG, SMALL))
+                .thenThrow(new NotFoundException("User not found."));
+
+        assertThatThrownBy(() -> service.sendDirectMessage(new MessageRequest(SMALL, "hi", null, null, null)))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("User not found.");
+    }
+
     @Test
     void sendGroupMessage_blankContent_throwsBadRequest() {
         TestFixtures.authenticateAs(BIG);

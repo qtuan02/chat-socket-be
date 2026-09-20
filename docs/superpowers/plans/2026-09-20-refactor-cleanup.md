@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - No new Maven dependencies. Test deps available: `spring-boot-starter-webmvc-test` (JUnit 6, Mockito, AssertJ, spring-test, spring-boot-test). There is **no** `spring-security-test` and **no** Testcontainers.
-- No behaviour change visible to clients: same URLs, same JSON field names, same HTTP status codes. Error message text is kept verbatim except the one case called out in Task 12 ("Member not found." → "User not found.").
+- No behaviour change visible to clients: same URLs, same JSON field names, same HTTP status codes. Error message text is kept verbatim except two cases, both same-status 404 text-only changes from consolidating direct-conversation lookup into `ConversationService.findOrCreateDirectConversation` (Task 12): `POST /v1/conversation` DIRECT with unknown member ("Member not found." → "User not found."), and `POST /v1/message/direct` with unknown recipient and no `conversationId` ("Recipient not found." → "User not found.", introduced when Task 13 made `MessageServiceImpl` delegate to the same method). Final review ratified the second case; see ledger.
 - Keep `BaseResponse<T>` returned from services and keep `service/X` + `service/impl/XImpl`.
 - Keep `constant/*` as interfaces.
 - Do **not** touch the four uncommitted files: `src/main/java/com/chat_socket/ApplicationYaml.java`, `config/SecurityServerConfig.java`, `config/WebSocketConfig.java`, `src/main/resources/application.yaml`. Never `git add -A`; add files by name.

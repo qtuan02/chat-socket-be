@@ -50,7 +50,7 @@ Không tạo dù lặp:
 - Xoá try/catch vô nghĩa trong `Security.getUserSecurityFromPrincipal`.
 - Xoá `ConversationServiceImpl.toResponseDto()` ×2 (wrapper 1 dòng) → gọi `conversationMapper.toDto` trực tiếp.
 - `MessageServiceImpl.sendDirectMessage`: `messageMapper.toDto(message)` gọi 1 lần.
-- Gộp: `MessageServiceImpl.findOrCreateDirectConversation / createDirectConversation / createParticipant` → gọi `ConversationService.findOrCreateDirectConversation(UUID senderId, UUID recipientId)` (method mới trên interface, impl tái dùng code sẵn có trong `ConversationServiceImpl`). Không vòng phụ thuộc: `ConversationService` không dùng `MessageService`.
+- Gộp: `MessageServiceImpl.findOrCreateDirectConversation / createDirectConversation / createParticipant` → gọi `ConversationService.findOrCreateDirectConversation(UUID senderId, UUID recipientId)` (method mới trên interface, impl tái dùng code sẵn có trong `ConversationServiceImpl`). Không vòng phụ thuộc: `ConversationService` không dùng `MessageService`. Hệ quả message text: `POST /v1/message/direct` với `recipientId` không tồn tại trả `"User not found."` thay vì `"Recipient not found."` (vẫn 404) — chấp nhận, cùng dạng đổi text với `"Member not found."` ở `createConversation`.
 - Thống nhất 400: mọi `return new BaseResponse<>(null, msg, HttpStatus.BAD_REQUEST.value())` → `throw new BadRequestException(msg)`. Handler đã có; client nhận y hệt. `CONFLICT`/`FORBIDDEN`/`NOT_FOUND` vẫn `return` vì chưa có exception tương ứng — không thêm.
 - `Normalize` chỉ còn text (`normalizeFullName`, `normalizeSearchText`, `normalizeTextPattern`, `normalizeUsernamePattern`). Tên giữ.
 - `PaginationUtils.resolveCursorPage`: bỏ biến `page` khai báo trước, return trực tiếp trong `try`.
