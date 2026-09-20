@@ -7,5 +7,7 @@ public interface RouteApi {
     String FRIEND_API = API_V1 + "/friend";
     String MESSAGE_API = API_V1 + "/message";
     String CONVERSATION_API = API_V1 + "/conversation";
+    String UPLOAD_API = API_V1 + "/upload";
+    String FILES = "/files";
     String HEALTH_API = "/health-check";
 }

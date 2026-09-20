@@ -40,7 +40,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceImplTest {
-    private static final ApplicationYaml CONFIG = new ApplicationYaml("secret", 15, 14, List.of());
+    private static final ApplicationYaml CONFIG = new ApplicationYaml("secret", 15, 14, List.of(), null, null);
 
     @Mock
     UserRepository userRepository;

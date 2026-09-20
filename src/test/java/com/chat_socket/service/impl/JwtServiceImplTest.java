@@ -10,7 +10,8 @@ import org.junit.jupiter.api.Test;
 class JwtServiceImplTest {
     // HS256 needs >= 32 bytes; 64 hex chars = 64 bytes as UTF-8
     private static final String SECRET = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-    private final JwtServiceImpl service = new JwtServiceImpl(new ApplicationYaml(SECRET, 15, 14, List.of()));
+    private final JwtServiceImpl service =
+            new JwtServiceImpl(new ApplicationYaml(SECRET, 15, 14, List.of(), null, null));
 
     @Test
     void generateToken_thenVerify_returnsSameUserId() {

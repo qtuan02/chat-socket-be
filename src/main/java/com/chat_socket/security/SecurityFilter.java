@@ -42,7 +42,8 @@ public class SecurityFilter extends OncePerRequestFilter {
         return HttpMethod.OPTIONS.matches(request.getMethod())
                 || requestUri.matches("/api/ws")
                 || requestUri.equals("/api" + RouteApi.HEALTH_API)
-                || requestUri.startsWith("/api" + RouteApi.AUTH_API);
+                || requestUri.startsWith("/api" + RouteApi.AUTH_API)
+                || requestUri.startsWith("/api" + RouteApi.FILES + "/");
     }
 
     @Override
