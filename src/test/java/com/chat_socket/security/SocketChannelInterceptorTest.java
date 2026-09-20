@@ -156,4 +156,31 @@ class SocketChannelInterceptorTest {
 
         assertThat(result).isNotNull();
     }
+
+    @Test
+    void subscribe_typingTopic_nonParticipant_isForbidden() {
+        UUID userId = UUID.randomUUID();
+        StompHeaderAccessor accessor = accessor(StompCommand.SUBSCRIBE);
+        accessor.setDestination("/topic/conversations/" + CONVERSATION_ID + "/typing");
+        accessor.setUser(Security.getUserAuthentication(TestFixtures.user(userId)));
+        when(participantRepository.existsByIdConversationIdAndIdUserIdAndLeftAtIsNullAndDeletedAtIsNull(
+                        CONVERSATION_ID, userId))
+                .thenReturn(false);
+
+        assertThatThrownBy(() -> interceptor.preSend(message(accessor), channel))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("You are not a participant of this conversation.");
+    }
+
+    @Test
+    void subscribe_conversationTopic_malformedId_isForbidden() {
+        UUID userId = UUID.randomUUID();
+        StompHeaderAccessor accessor = accessor(StompCommand.SUBSCRIBE);
+        accessor.setDestination("/topic/conversations/not-a-uuid/typing");
+        accessor.setUser(Security.getUserAuthentication(TestFixtures.user(userId)));
+
+        assertThatThrownBy(() -> interceptor.preSend(message(accessor), channel))
+                .isInstanceOf(ForbiddenException.class)
+                .hasMessage("Conversation destination is invalid.");
+    }
 }
