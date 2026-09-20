@@ -62,6 +62,36 @@ Bỏ: `group.deleted` (dùng `conversation.removed` cho mọi trường hợp b�
 
 SUBSCRIBE bất kỳ topic `/topic/conversations/{id}/...` nào (kể cả `/typing`) đều cần là active participant của conversation đó, không riêng `/messages`.
 
+## 5b. JSON mẫu
+
+```jsonc
+// /user/queue/conversations
+{ "eventType": "conversation.updated",
+  "conversation": { "id": "…", "type": "GROUP", "groupName": "Team", "lastMessage": { /* MessageDto */ },
+                    "lastMessageAt": "2026-09-20T10:00:00.123456Z", "unreadCount": 2,
+                    "participants": [ { "userId": "…", "username": "alice", "firstName": "A", "lastName": "L",
+                                        "avatarUrl": null, "role": "ADMIN", "joinedAt": "…",
+                                        "lastReadMessageId": "…", "lastReadAt": "…" } ] } }
+{ "eventType": "conversation.removed", "conversationId": "…" }
+{ "eventType": "conversation.seen", "conversationId": "…", "seenByUserId": "…", "lastReadMessageId": "…", "lastReadAt": "…" }
+
+// /topic/conversations/{id}/messages
+{ "eventType": "message.created", "message": { "id": "…", "conversationId": "…", "senderId": "…", "content": "hi",
+                                              "attachmentUrl": null, "type": "TEXT", "createdAt": "…", "updatedAt": "…" } }
+
+// /topic/conversations/{id}/typing
+{ "eventType": "typing", "conversationId": "…", "userId": "…" }
+
+// POST /v1/upload → 201
+{ "data": { "url": "http://localhost:8089/api/files/0199….png", "name": "0199….png", "size": 12345, "contentType": "image/png" },
+  "message": "File uploaded successfully.", "status": 201 }
+```
+
+## 5c. Sửa thêm sau review cuối (commit `1da0b1a`)
+
+- `participants` (trong `GET /conversation*` và `conversation.updated`) **chỉ còn active member** — người đã rời/bị kick/đã xóa không xuất hiện nữa. FE bỏ mọi filter `leftAt` phía client nếu có; `readersOf` không cần lo member cũ.
+- `GET /api/files/{name}` trả `Content-Disposition: attachment` + `X-Content-Type-Options: nosniff`. `<img src>`/`<video src>` vẫn hiển thị bình thường; **mở URL trực tiếp (new tab / `<a href>` không `download`) sẽ tải file về chứ không render**. Preview ảnh: dùng `<img>`; file khác: link tải.
+
 ## 6. Checklist file FE
 
 - `packages/types/src/chat-*.ts`: cập nhật theo §2, §4, §5.
