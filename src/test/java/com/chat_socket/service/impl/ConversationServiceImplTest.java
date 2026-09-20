@@ -161,30 +161,26 @@ class ConversationServiceImplTest {
     // ---------- createConversation ----------
 
     @Test
-    void createConversation_unknownType_returns400() { // 400-as-return
-        BaseResponse<ConversationDto> response =
-                service.createConversation(new ConversationRequest(null, "x", List.of(SMALL)));
-
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.message()).isEqualTo("Conversation type is invalid.");
+    void createConversation_unknownType_throwsBadRequest() {
+        assertThatThrownBy(() -> service.createConversation(new ConversationRequest(null, "x", List.of(SMALL))))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Conversation type is invalid.");
     }
 
     @Test
-    void createDirect_moreThanOneMember_returns400() { // 400-as-return
-        BaseResponse<ConversationDto> response = service.createConversation(
-                new ConversationRequest(ConversationType.DIRECT, null, List.of(SMALL, THIRD)));
-
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.message()).isEqualTo("Direct conversation requires exactly one member.");
+    void createDirect_moreThanOneMember_throwsBadRequest() {
+        assertThatThrownBy(() -> service.createConversation(
+                        new ConversationRequest(ConversationType.DIRECT, null, List.of(SMALL, THIRD))))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Direct conversation requires exactly one member.");
     }
 
     @Test
-    void createDirect_withSelf_returns400() { // 400-as-return
-        BaseResponse<ConversationDto> response =
-                service.createConversation(new ConversationRequest(ConversationType.DIRECT, null, List.of(BIG)));
-
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.message()).isEqualTo("You cannot create a direct conversation with yourself.");
+    void createDirect_withSelf_throwsBadRequest() {
+        assertThatThrownBy(() -> service.createConversation(
+                        new ConversationRequest(ConversationType.DIRECT, null, List.of(BIG))))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("You cannot create a direct conversation with yourself.");
     }
 
     @Test
@@ -239,12 +235,11 @@ class ConversationServiceImplTest {
     }
 
     @Test
-    void createGroup_blankName_returns400() { // 400-as-return
-        BaseResponse<ConversationDto> response =
-                service.createConversation(new ConversationRequest(ConversationType.GROUP, "  ", List.of(SMALL)));
-
-        assertThat(response.status()).isEqualTo(400);
-        assertThat(response.message()).isEqualTo("Group name is required.");
+    void createGroup_blankName_throwsBadRequest() {
+        assertThatThrownBy(() -> service.createConversation(
+                        new ConversationRequest(ConversationType.GROUP, "  ", List.of(SMALL))))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessage("Group name is required.");
     }
 
     @Test
@@ -288,6 +283,30 @@ class ConversationServiceImplTest {
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(BIG, ParticipantRole.ADMIN),
                         org.assertj.core.groups.Tuple.tuple(SMALL, ParticipantRole.MEMBER));
+    }
+
+    // ---------- findOrCreateDirectConversation ----------
+
+    @Test
+    void findOrCreateDirectConversation_missingOtherUser_throwsNotFound() {
+        when(userRepository.findById(BIG)).thenReturn(Optional.of(TestFixtures.user(BIG)));
+        when(userRepository.findById(SMALL)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.findOrCreateDirectConversation(BIG, SMALL))
+                .isInstanceOf(NotFoundException.class)
+                .hasMessage("User not found.");
+    }
+
+    @Test
+    void findOrCreateDirectConversation_existing_returnsItWithoutSaving() {
+        ConversationEntity conversation = TestFixtures.conversation(C, ConversationType.DIRECT);
+        when(userRepository.findById(BIG)).thenReturn(Optional.of(TestFixtures.user(BIG)));
+        when(userRepository.findById(SMALL)).thenReturn(Optional.of(TestFixtures.user(SMALL)));
+        when(conversationRepository.findDirectConversation(ConversationType.DIRECT, SMALL, BIG))
+                .thenReturn(Optional.of(conversation));
+
+        assertThat(service.findOrCreateDirectConversation(BIG, SMALL)).isSameAs(conversation);
+        verify(conversationRepository, never()).saveAndFlush(any());
     }
 
     // ---------- getMessages ----------

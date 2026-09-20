@@ -105,10 +105,8 @@ public class ConversationServiceImpl implements ConversationService {
         PaginationResponse<ConversationDto> body = PaginationUtils.toCursorResponse(
                 fetchedConversationIds,
                 page,
-                conversationId -> {
-                    ConversationEntity conversation = conversationsById.get(conversationId);
-                    return toResponseDto(conversation, unreadCounts.getOrDefault(conversationId, 0L));
-                },
+                conversationId -> conversationMapper.toDto(
+                        conversationsById.get(conversationId), unreadCounts.getOrDefault(conversationId, 0L)),
                 conversationId -> {
                     ConversationEntity conversation = conversationsById.get(conversationId);
                     return conversation.getLastMessageAt() == null
@@ -131,7 +129,21 @@ public class ConversationServiceImpl implements ConversationService {
         if (request.type() == ConversationType.GROUP)
             return createGroupConversation(currentUser.id(), request.name(), request.memberIds());
 
-        return new BaseResponse<>(null, "Conversation type is invalid.", HttpStatus.BAD_REQUEST.value());
+        throw new BadRequestException("Conversation type is invalid.");
+    }
+
+    @Override
+    @Transactional
+    public ConversationEntity findOrCreateDirectConversation(UUID currentUserId, UUID otherUserId) {
+        UserEntity currentUser =
+                userRepository.findById(currentUserId).orElseThrow(() -> new NotFoundException("User not found."));
+        UserEntity otherUser =
+                userRepository.findById(otherUserId).orElseThrow(() -> new NotFoundException("User not found."));
+
+        UserPair pair = UserPair.of(currentUserId, otherUserId);
+        return conversationRepository
+                .findDirectConversation(ConversationType.DIRECT, pair.userAId(), pair.userBId())
+                .orElseGet(() -> createDirectConversation(currentUser, otherUser, pair));
     }
 
     @Override
@@ -218,14 +230,10 @@ public class ConversationServiceImpl implements ConversationService {
         conversationRepository.save(conversation);
 
         ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
-
-        MessageDto lastMessage =
-                conversation.getLastMessage() == null ? null : messageMapper.toDto(conversation.getLastMessage());
-        socketPublisher.publishConversationUpdatedAfterCommit(
-                conversation.getId(), lastMessage, conversation.getLastMessageAt());
+        publishConversationUpdated(conversation);
 
         return new BaseResponse<>(
-                toResponseDto(updatedConversation), "Group updated successfully.", HttpStatus.OK.value());
+                conversationMapper.toDto(updatedConversation), "Group updated successfully.", HttpStatus.OK.value());
     }
 
     @Override
@@ -245,7 +253,7 @@ public class ConversationServiceImpl implements ConversationService {
         if (uniqueMemberIds.isEmpty()) {
             ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
             return new BaseResponse<>(
-                    toResponseDto(updatedConversation), "Members already in group.", HttpStatus.OK.value());
+                    conversationMapper.toDto(updatedConversation), "Members already in group.", HttpStatus.OK.value());
         }
 
         ensureFriendWithAllMembers(currentUser.id(), new ArrayList<>(uniqueMemberIds));
@@ -283,14 +291,10 @@ public class ConversationServiceImpl implements ConversationService {
         if (hasChanges) conversationRepository.save(conversation);
 
         ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
-
-        MessageDto lastMessage =
-                conversation.getLastMessage() == null ? null : messageMapper.toDto(conversation.getLastMessage());
-        socketPublisher.publishConversationUpdatedAfterCommit(
-                conversation.getId(), lastMessage, conversation.getLastMessageAt());
+        publishConversationUpdated(conversation);
 
         return new BaseResponse<>(
-                toResponseDto(updatedConversation), "Members added successfully.", HttpStatus.OK.value());
+                conversationMapper.toDto(updatedConversation), "Members added successfully.", HttpStatus.OK.value());
     }
 
     @Override
@@ -318,14 +322,12 @@ public class ConversationServiceImpl implements ConversationService {
         conversationRepository.save(conversation);
 
         ConversationEntity updatedConversation = findConversationWithDetails(conversationId);
-
-        MessageDto lastMessage =
-                conversation.getLastMessage() == null ? null : messageMapper.toDto(conversation.getLastMessage());
-        socketPublisher.publishConversationUpdatedAfterCommit(
-                conversation.getId(), lastMessage, conversation.getLastMessageAt());
+        publishConversationUpdated(conversation);
 
         return new BaseResponse<>(
-                toResponseDto(updatedConversation), "Member removed from group successfully.", HttpStatus.OK.value());
+                conversationMapper.toDto(updatedConversation),
+                "Member removed from group successfully.",
+                HttpStatus.OK.value());
     }
 
     @Override
@@ -345,10 +347,7 @@ public class ConversationServiceImpl implements ConversationService {
         participantRepository.save(currentParticipant);
         conversationRepository.save(conversation);
 
-        MessageDto lastMessage =
-                conversation.getLastMessage() == null ? null : messageMapper.toDto(conversation.getLastMessage());
-        socketPublisher.publishConversationUpdatedAfterCommit(
-                conversation.getId(), lastMessage, conversation.getLastMessageAt());
+        publishConversationUpdated(conversation);
 
         return new BaseResponse<>(null, "Left group successfully.", HttpStatus.OK.value());
     }
@@ -406,36 +405,34 @@ public class ConversationServiceImpl implements ConversationService {
             throw new ForbiddenException("You are not a participant of this conversation.");
     }
 
+    /** Tells every active participant that the conversation changed (name, members, last message). */
+    private void publishConversationUpdated(ConversationEntity conversation) {
+        MessageDto lastMessage =
+                conversation.getLastMessage() == null ? null : messageMapper.toDto(conversation.getLastMessage());
+        socketPublisher.publishConversationUpdatedAfterCommit(
+                conversation.getId(), lastMessage, conversation.getLastMessageAt());
+    }
+
     private BaseResponse<ConversationDto> createDirectConversation(UUID currentUserId, List<UUID> memberIds) {
-        if (memberIds.size() != 1)
-            return new BaseResponse<>(
-                    null, "Direct conversation requires exactly one member.", HttpStatus.BAD_REQUEST.value());
+        if (memberIds.size() != 1) throw new BadRequestException("Direct conversation requires exactly one member.");
 
         UUID participantId = memberIds.getFirst();
         if (currentUserId.equals(participantId))
-            return new BaseResponse<>(
-                    null, "You cannot create a direct conversation with yourself.", HttpStatus.BAD_REQUEST.value());
+            throw new BadRequestException("You cannot create a direct conversation with yourself.");
 
-        UserEntity currentUser =
-                userRepository.findById(currentUserId).orElseThrow(() -> new NotFoundException("User not found."));
-        UserEntity participant =
-                userRepository.findById(participantId).orElseThrow(() -> new NotFoundException("Member not found."));
-
-        UserPair pair = UserPair.of(currentUserId, participantId);
-        ConversationEntity conversation = conversationRepository
-                .findDirectConversation(ConversationType.DIRECT, pair.userAId(), pair.userBId())
-                .orElseGet(() -> createDirectConversation(currentUser, participant, pair));
+        ConversationEntity conversation = findOrCreateDirectConversation(currentUserId, participantId);
         participantRepository.restoreDeletedParticipant(conversation.getId(), currentUserId);
         conversation = findConversationWithDetails(conversation.getId());
 
         return new BaseResponse<>(
-                toResponseDto(conversation), "Conversation created successfully.", HttpStatus.CREATED.value());
+                conversationMapper.toDto(conversation),
+                "Conversation created successfully.",
+                HttpStatus.CREATED.value());
     }
 
     private BaseResponse<ConversationDto> createGroupConversation(
             UUID currentUserId, String name, List<UUID> memberIds) {
-        if (name == null || name.isBlank())
-            return new BaseResponse<>(null, "Group name is required.", HttpStatus.BAD_REQUEST.value());
+        if (name == null || name.isBlank()) throw new BadRequestException("Group name is required.");
 
         UserEntity currentUser =
                 userRepository.findById(currentUserId).orElseThrow(() -> new NotFoundException("User not found."));
@@ -468,7 +465,9 @@ public class ConversationServiceImpl implements ConversationService {
         conversation.setParticipants(participants);
 
         return new BaseResponse<>(
-                toResponseDto(conversation), "Conversation created successfully.", HttpStatus.CREATED.value());
+                conversationMapper.toDto(conversation),
+                "Conversation created successfully.",
+                HttpStatus.CREATED.value());
     }
 
     private ConversationEntity createDirectConversation(UserEntity currentUser, UserEntity participant, UserPair pair) {
@@ -503,13 +502,5 @@ public class ConversationServiceImpl implements ConversationService {
         participant.setUser(user);
         participant.setRole(participantRole);
         return participantRepository.save(participant);
-    }
-
-    private ConversationDto toResponseDto(ConversationEntity conversation) {
-        return conversationMapper.toDto(conversation);
-    }
-
-    private ConversationDto toResponseDto(ConversationEntity conversation, long unreadCount) {
-        return conversationMapper.toDto(conversation, unreadCount);
     }
 }
