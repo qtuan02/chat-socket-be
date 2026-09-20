@@ -1,0 +1,91 @@
+package com.chat_socket.controller;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.chat_socket.config.GlobalExceptionHandler;
+import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.MessageRequest;
+import com.chat_socket.exception.ForbiddenException;
+import com.chat_socket.service.MessageService;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+@ExtendWith(MockitoExtension.class)
+class MessageControllerTest {
+    private static final UUID ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
+
+    @Mock
+    MessageService messageService;
+
+    MockMvc mockMvc;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders.standaloneSetup(new MessageController(messageService))
+                .setControllerAdvice(new GlobalExceptionHandler())
+                .build();
+    }
+
+    @Test
+    void sendDirect_validBody_returns201() throws Exception {
+        when(messageService.sendDirectMessage(new MessageRequest(ID, "hi", null, null, null)))
+                .thenReturn(new BaseResponse<>(null, "Message sent successfully.", 201));
+
+        mockMvc.perform(post("/v1/message/direct")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"recipientId\":\"" + ID + "\",\"content\":\"hi\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.message").value("Message sent successfully."));
+    }
+
+    @Test
+    void sendDirect_blankContent_returns400Validation() throws Exception {
+        mockMvc.perform(post("/v1/message/direct")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"recipientId\":\"" + ID + "\",\"content\":\"  \"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.data.content").value("Content is required"));
+    }
+
+    @Test
+    void sendGroup_forbiddenException_returns403() throws Exception {
+        when(messageService.sendGroupMessage(new MessageRequest(null, "hi", null, ID, null)))
+                .thenThrow(new ForbiddenException("You are not a participant of this conversation."));
+
+        mockMvc.perform(post("/v1/message/group")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"conversationId\":\"" + ID + "\",\"content\":\"hi\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.message").value("You are not a participant of this conversation."));
+    }
+
+    @Test
+    void sendGroup_isGuardedByMessageGroupPermission() throws Exception {
+        PreAuthorize guard = MessageController.class
+                .getMethod("sendGroupMessage", MessageRequest.class)
+                .getAnnotation(PreAuthorize.class);
+
+        assertThat(guard).isNotNull();
+        assertThat(guard.value()).isEqualTo("@messageGroupPermission.canSendGroup(#request.conversationId())");
+    }
+
+    @Test
+    void sendDirect_hasNoPreAuthorizeGuard() throws Exception {
+        assertThat(MessageController.class
+                        .getMethod("sendDirectMessage", MessageRequest.class)
+                        .getAnnotation(PreAuthorize.class))
+                .isNull();
+    }
+}
