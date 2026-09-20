@@ -56,7 +56,7 @@ public class SecurityServerConfig {
         config.setAllowCredentials(true);
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedOrigins(List.of(applicationYaml.clientUrl()));
+        config.setAllowedOrigins(applicationYaml.clientUrl());
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
