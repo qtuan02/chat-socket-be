@@ -2,6 +2,7 @@ package com.chat_socket.controller;
 
 import com.chat_socket.constant.RouteApi;
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.ChangePasswordRequest;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.dto.UpdateUserRequest;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -48,9 +50,15 @@ public class UserController {
         return ResponseEntity.status(body.status()).body(body);
     }
 
-    @GetMapping("/info")
-    public ResponseEntity<BaseResponse<UserInfoDto>> getInfo(@RequestParam UUID userId) {
+    @GetMapping("/{userId}")
+    public ResponseEntity<BaseResponse<UserInfoDto>> getInfo(@PathVariable UUID userId) {
         BaseResponse<UserInfoDto> body = userService.getUserInfo(userId);
+        return ResponseEntity.status(body.status()).body(body);
+    }
+
+    @PatchMapping("/me/password")
+    public ResponseEntity<BaseResponse<Void>> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        BaseResponse<Void> body = userService.changePassword(request);
         return ResponseEntity.status(body.status()).body(body);
     }
 }

@@ -16,7 +16,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -25,6 +25,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.SQLRestriction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 @Getter
@@ -65,18 +66,20 @@ public class ConversationEntity {
     private MessageEntity lastMessage;
 
     @Column(name = "last_message_at")
-    private LocalDateTime lastMessageAt;
+    private Instant lastMessageAt;
 
+    /** Only active participants — a kicked/left member must not reappear in a loaded conversation's roster. */
     @OneToMany(mappedBy = "conversation")
+    @SQLRestriction("left_at IS NULL AND deleted_at IS NULL")
     private List<ParticipantEntity> participants = new ArrayList<>();
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
-    private LocalDateTime createdAt;
+    private Instant createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
     @PrePersist
     @PreUpdate

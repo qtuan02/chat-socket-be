@@ -39,13 +39,13 @@ public class SecurityServerConfig {
         http.csrf(csrf -> csrf.disable())
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .authorizeHttpRequests(
-                        auth -> auth.requestMatchers(RouteApi.AUTH_API + "/**", RouteApi.HEALTH_API, "/ws*")
-                                .permitAll()
-                                .requestMatchers(HttpMethod.OPTIONS, "/**")
-                                .permitAll()
-                                .anyRequest()
-                                .authenticated())
+                .authorizeHttpRequests(auth -> auth.requestMatchers(
+                                RouteApi.AUTH_API + "/**", RouteApi.HEALTH_API, RouteApi.FILES + "/**", "/ws*")
+                        .permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**")
+                        .permitAll()
+                        .anyRequest()
+                        .authenticated())
                 .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
@@ -56,7 +56,7 @@ public class SecurityServerConfig {
         config.setAllowCredentials(true);
         config.setAllowedHeaders(List.of("*"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedOrigins(List.of(applicationYaml.clientUrl()));
+        config.setAllowedOrigins(applicationYaml.clientUrl());
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

@@ -1,11 +1,18 @@
 package com.chat_socket.service;
 
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.DirectMessageRequest;
+import com.chat_socket.dto.GroupMessageRequest;
 import com.chat_socket.dto.MessageDto;
-import com.chat_socket.dto.MessageRequest;
+import com.chat_socket.dto.UpdateMessageRequest;
+import java.util.UUID;
 
 public interface MessageService {
-    BaseResponse<MessageDto> sendDirectMessage(MessageRequest request);
+    BaseResponse<MessageDto> sendDirectMessage(DirectMessageRequest request);
 
-    BaseResponse<MessageDto> sendGroupMessage(MessageRequest request);
+    BaseResponse<MessageDto> sendGroupMessage(GroupMessageRequest request);
+
+    BaseResponse<MessageDto> updateMessage(UUID messageId, UpdateMessageRequest request);
+
+    BaseResponse<Void> deleteMessage(UUID messageId);
 }

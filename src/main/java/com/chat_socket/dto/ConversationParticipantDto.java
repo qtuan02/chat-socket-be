@@ -1,15 +1,16 @@
 package com.chat_socket.dto;
 
 import com.chat_socket.enums.ParticipantRole;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 public record ConversationParticipantDto(
         UUID userId,
+        String username,
         String firstName,
         String lastName,
         String avatarUrl,
         ParticipantRole role,
-        LocalDateTime joinedAt,
+        Instant joinedAt,
         UUID lastReadMessageId,
-        LocalDateTime lastReadAt) {}
+        Instant lastReadAt) {}

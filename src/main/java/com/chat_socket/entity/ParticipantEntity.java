@@ -13,7 +13,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.MapsId;
 import jakarta.persistence.Table;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -51,7 +51,7 @@ public class ParticipantEntity {
     private ParticipantRole role = ParticipantRole.MEMBER;
 
     @Column(name = "last_read_at")
-    private LocalDateTime lastReadAt;
+    private Instant lastReadAt;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "last_read_message_id")
@@ -59,17 +59,15 @@ public class ParticipantEntity {
 
     @CreationTimestamp
     @Column(name = "joined_at", nullable = false, updatable = false)
-    private LocalDateTime joinedAt;
+    private Instant joinedAt;
 
     @Column(name = "left_at")
-    private LocalDateTime leftAt;
-
-    @Column(name = "archived_at")
-    private LocalDateTime archivedAt;
+    private Instant leftAt;
 
     @Column(name = "deleted_at")
-    private LocalDateTime deletedAt;
+    private Instant deletedAt;
 
-    @Column(name = "muted_until")
-    private LocalDateTime mutedUntil;
+    public boolean isActive() {
+        return leftAt == null && deletedAt == null;
+    }
 }

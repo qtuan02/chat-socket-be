@@ -23,10 +23,7 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class SocketChannelInterceptor implements ChannelInterceptor {
-    private static final String BEARER_PREFIX = "Bearer ";
-    private static final String CONVERSATION_MESSAGE_DESTINATION_PREFIX =
-            SocketChannel.TOPIC + SocketChannel.CONVERSATION + "/";
-    private static final String CONVERSATION_MESSAGE_DESTINATION_SUFFIX = SocketChannel.MESSAGE;
+    private static final String CONVERSATION_TOPIC_PREFIX = SocketChannel.TOPIC + SocketChannel.CONVERSATION + "/";
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
@@ -56,16 +53,12 @@ public class SocketChannelInterceptor implements ChannelInterceptor {
     }
 
     private void authenticateConnect(StompHeaderAccessor accessor) {
-        String authorizationHeader = accessor.getFirstNativeHeader(HttpHeaders.AUTHORIZATION);
-        if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX))
-            throw new NotFoundException("Token not found.");
+        String accessToken = Security.extractBearerToken(accessor.getFirstNativeHeader(HttpHeaders.AUTHORIZATION));
+        if (accessToken == null) throw new NotFoundException("Token not found.");
 
-        String accessToken =
-                authorizationHeader.substring(BEARER_PREFIX.length()).trim();
-        if (accessToken.isBlank()) throw new NotFoundException("Token not found.");
-
-        UUID userId = Security.getUserIdFromAccessToken(jwtService, accessToken);
-        if (userId == null) throw new ForbiddenException("Token expired or invalid.");
+        UUID userId = jwtService
+                .verifyAccessToken(accessToken)
+                .orElseThrow(() -> new ForbiddenException("Token expired or invalid."));
 
         UserEntity user =
                 userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User does not exist."));
@@ -77,32 +70,22 @@ public class SocketChannelInterceptor implements ChannelInterceptor {
     private void authorizeSubscribe(StompHeaderAccessor accessor) {
         Principal principal = accessor.getUser();
         String destination = accessor.getDestination();
-
-        if (destination == null || !isConversationMessageDestination(destination)) return;
+        if (destination == null || !destination.startsWith(CONVERSATION_TOPIC_PREFIX)) return;
 
         UUID conversationId = conversationIdFromDestination(destination);
-
         if (principal == null) throw new ForbiddenException("Socket user is not authenticated.");
-
         UserSecurity userSecurity = Security.getUserSecurityFromPrincipal(principal);
         if (userSecurity == null) throw new ForbiddenException("Socket user is invalid.");
-
-        UUID userId = userSecurity.id();
-
         if (!participantRepository.existsByIdConversationIdAndIdUserIdAndLeftAtIsNullAndDeletedAtIsNull(
-                conversationId, userId))
+                conversationId, userSecurity.id()))
             throw new ForbiddenException("You are not a participant of this conversation.");
     }
 
-    private boolean isConversationMessageDestination(String destination) {
-        return destination.startsWith(CONVERSATION_MESSAGE_DESTINATION_PREFIX)
-                && destination.endsWith(CONVERSATION_MESSAGE_DESTINATION_SUFFIX);
-    }
-
+    /** {@code /topic/conversations/<id>/<anything>} → id. */
     private UUID conversationIdFromDestination(String destination) {
-        String conversationId = destination.substring(
-                CONVERSATION_MESSAGE_DESTINATION_PREFIX.length(),
-                destination.length() - CONVERSATION_MESSAGE_DESTINATION_SUFFIX.length());
+        String rest = destination.substring(CONVERSATION_TOPIC_PREFIX.length());
+        int slash = rest.indexOf('/');
+        String conversationId = slash < 0 ? rest : rest.substring(0, slash);
         try {
             return UUID.fromString(conversationId);
         } catch (IllegalArgumentException exception) {

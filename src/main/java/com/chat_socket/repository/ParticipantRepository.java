@@ -21,6 +21,10 @@ public interface ParticipantRepository extends JpaRepository<ParticipantEntity, 
 
     Optional<ParticipantEntity> findByIdConversationIdAndIdUserId(UUID conversationId, UUID userId);
 
+    default Optional<ParticipantEntity> findActiveParticipant(UUID conversationId, UUID userId) {
+        return findByIdConversationIdAndIdUserId(conversationId, userId).filter(ParticipantEntity::isActive);
+    }
+
     @Query("""
             SELECT p.user.id
             FROM ParticipantEntity p

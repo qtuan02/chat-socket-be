@@ -1,6 +1,7 @@
 package com.chat_socket.service;
 
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.ChangePasswordRequest;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.dto.UpdateUserRequest;
@@ -17,4 +18,6 @@ public interface UserService {
     BaseResponse<UserInfoDto> getUserInfo(UUID userId);
 
     BaseResponse<PaginationResponse<UserSearchDto>> searchUsers(PaginationRequest request, String search);
+
+    BaseResponse<Void> changePassword(ChangePasswordRequest request);
 }

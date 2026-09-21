@@ -25,8 +25,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 @Component
 public class SecurityFilter extends OncePerRequestFilter {
-    private static final String BEARER_PREFIX = "Bearer ";
-
     private final ObjectMapper objectMapper;
     private final JwtService jwtService;
     private final UserRepository userRepository;
@@ -44,27 +42,20 @@ public class SecurityFilter extends OncePerRequestFilter {
         return HttpMethod.OPTIONS.matches(request.getMethod())
                 || requestUri.matches("/api/ws")
                 || requestUri.equals("/api" + RouteApi.HEALTH_API)
-                || requestUri.startsWith("/api" + RouteApi.AUTH_API);
+                || requestUri.startsWith("/api" + RouteApi.AUTH_API)
+                || requestUri.startsWith("/api" + RouteApi.FILES + "/");
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws IOException, ServletException {
-        // Get token from header
-        String authorizationHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (authorizationHeader == null || !authorizationHeader.startsWith(BEARER_PREFIX)) {
-            writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Token not found.");
-            return;
-        }
-        String accessToken =
-                authorizationHeader.substring(BEARER_PREFIX.length()).trim();
-        if (accessToken.isBlank()) {
+        String accessToken = Security.extractBearerToken(request.getHeader(HttpHeaders.AUTHORIZATION));
+        if (accessToken == null) {
             writeErrorResponse(response, HttpStatus.UNAUTHORIZED, "Token not found.");
             return;
         }
 
-        // Verify Token and get user id
-        UUID userId = Security.getUserIdFromAccessToken(jwtService, accessToken);
+        UUID userId = jwtService.verifyAccessToken(accessToken).orElse(null);
         if (userId == null) {
             SecurityContextHolder.clearContext();
             writeErrorResponse(response, HttpStatus.FORBIDDEN, "Token expired or invalid.");

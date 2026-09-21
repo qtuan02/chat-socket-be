@@ -1,8 +1,6 @@
 package com.chat_socket.service.impl;
 
-import com.chat_socket.dto.AcceptFriendResponse;
 import com.chat_socket.dto.BaseResponse;
-import com.chat_socket.dto.FriendActionRequest;
 import com.chat_socket.dto.FriendDto;
 import com.chat_socket.dto.FriendRequestResponse;
 import com.chat_socket.dto.FriendSendRequest;
@@ -10,13 +8,15 @@ import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.dto.UserPair;
 import com.chat_socket.dto.UserSecurity;
+import com.chat_socket.dto.UserSummaryDto;
 import com.chat_socket.entity.FriendEntity;
 import com.chat_socket.entity.FriendRequestEntity;
 import com.chat_socket.entity.UserEntity;
 import com.chat_socket.enums.FriendRequestStatus;
+import com.chat_socket.exception.BadRequestException;
 import com.chat_socket.exception.NotFoundException;
-import com.chat_socket.mapper.FriendMapper;
 import com.chat_socket.mapper.FriendRequestMapper;
+import com.chat_socket.mapper.UserMapper;
 import com.chat_socket.repository.FriendRepository;
 import com.chat_socket.repository.FriendRequestRepository;
 import com.chat_socket.repository.UserRepository;
@@ -35,19 +35,19 @@ public class FriendServiceImpl implements FriendService {
     private final UserRepository userRepository;
     private final FriendRepository friendRepository;
     private final FriendRequestRepository friendRequestRepository;
-    private final FriendMapper friendMapper;
+    private final UserMapper userMapper;
     private final FriendRequestMapper friendRequestMapper;
 
     public FriendServiceImpl(
             UserRepository userRepository,
             FriendRepository friendRepository,
             FriendRequestRepository friendRequestRepository,
-            FriendMapper friendMapper,
+            UserMapper userMapper,
             FriendRequestMapper friendRequestMapper) {
         this.userRepository = userRepository;
         this.friendRepository = friendRepository;
         this.friendRequestRepository = friendRequestRepository;
-        this.friendMapper = friendMapper;
+        this.userMapper = userMapper;
         this.friendRequestMapper = friendRequestMapper;
     }
 
@@ -64,7 +64,7 @@ public class FriendServiceImpl implements FriendService {
                 userId, usernameSearch, normalizedNameSearch, page.pageRequest());
 
         PaginationResponse<FriendDto> result = PaginationUtils.toOffsetResponse(
-                fetchedFriendships, page, friendship -> friendMapper.toFriendDto(getFriendUser(friendship, userId)));
+                fetchedFriendships, page, friendship -> userMapper.toFriendDto(friendship.otherUser(userId)));
 
         return new BaseResponse<>(result, "Success.", HttpStatus.OK.value());
     }
@@ -94,17 +94,14 @@ public class FriendServiceImpl implements FriendService {
         UUID fromUserId = currentUser.id();
         UUID toUserId = request.toUserId();
 
-        if (fromUserId.equals(toUserId))
-            return new BaseResponse<>(
-                    null, "You cannot send a friend request to yourself.", HttpStatus.BAD_REQUEST.value());
+        if (fromUserId.equals(toUserId)) throw new BadRequestException("You cannot send a friend request to yourself.");
 
         UserEntity fromUser =
                 userRepository.findById(fromUserId).orElseThrow(() -> new NotFoundException("User not found."));
         UserEntity toUser =
                 userRepository.findById(toUserId).orElseThrow(() -> new NotFoundException("User not found."));
 
-        UserPair pair = Normalize.normalizeUserPair(fromUserId, toUserId);
-        if (friendRepository.existsByUserAIdAndUserBId(pair.userAId(), pair.userBId()))
+        if (friendRepository.existsFriendship(fromUserId, toUserId))
             return new BaseResponse<>(null, "You are already friends.", HttpStatus.CONFLICT.value());
 
         boolean pendingRequestExists =
@@ -123,10 +120,9 @@ public class FriendServiceImpl implements FriendService {
 
     @Override
     @Transactional
-    public BaseResponse<AcceptFriendResponse> acceptFriendRequest(FriendActionRequest request) {
+    public BaseResponse<UserSummaryDto> acceptFriendRequest(UUID requestId) {
         UserSecurity currentUser = Security.getCurrentUser();
         UUID currentUserId = currentUser.id();
-        UUID requestId = request.requestId();
 
         FriendRequestEntity friendRequest = friendRequestRepository
                 .findById(requestId)
@@ -149,17 +145,16 @@ public class FriendServiceImpl implements FriendService {
                 .findById(friendRequest.getFromUser().getId())
                 .orElseThrow(() -> new NotFoundException("User not found."));
 
-        AcceptFriendResponse response = friendMapper.toAcceptFriendResponse(user);
+        UserSummaryDto response = userMapper.toSummaryDto(user);
 
         return new BaseResponse<>(response, "Friend request accepted successfully.", HttpStatus.CREATED.value());
     }
 
     @Override
     @Transactional
-    public BaseResponse<String> declineFriendRequest(FriendActionRequest request) {
+    public BaseResponse<String> declineFriendRequest(UUID requestId) {
         UserSecurity currentUser = Security.getCurrentUser();
         UUID currentUserId = currentUser.id();
-        UUID requestId = request.requestId();
 
         FriendRequestEntity friendRequest = friendRequestRepository
                 .findById(requestId)
@@ -178,10 +173,9 @@ public class FriendServiceImpl implements FriendService {
 
     @Override
     @Transactional
-    public BaseResponse<String> cancelFriendRequest(FriendActionRequest request) {
+    public BaseResponse<String> cancelFriendRequest(UUID requestId) {
         UserSecurity currentUser = Security.getCurrentUser();
         UUID currentUserId = currentUser.id();
-        UUID requestId = request.requestId();
 
         FriendRequestEntity friendRequest = friendRequestRepository
                 .findById(requestId)
@@ -205,14 +199,10 @@ public class FriendServiceImpl implements FriendService {
         if (currentUser.id().equals(friendId))
             return new BaseResponse<>(null, "Friend not found.", HttpStatus.NOT_FOUND.value());
 
-        UserPair pair = Normalize.normalizeUserPair(currentUser.id(), friendId);
+        UserPair pair = UserPair.of(currentUser.id(), friendId);
         long deleted = friendRepository.deleteByUserAIdAndUserBId(pair.userAId(), pair.userBId());
         if (deleted == 0) return new BaseResponse<>(null, "Friend not found.", HttpStatus.NOT_FOUND.value());
 
         return new BaseResponse<>(null, null, HttpStatus.NO_CONTENT.value());
-    }
-
-    private UserEntity getFriendUser(FriendEntity friendship, UUID currentUserId) {
-        return friendship.getUserA().getId().equals(currentUserId) ? friendship.getUserB() : friendship.getUserA();
     }
 }

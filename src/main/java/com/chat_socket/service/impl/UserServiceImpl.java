@@ -1,11 +1,11 @@
 package com.chat_socket.service.impl;
 
 import com.chat_socket.dto.BaseResponse;
+import com.chat_socket.dto.ChangePasswordRequest;
 import com.chat_socket.dto.PaginationRequest;
 import com.chat_socket.dto.PaginationResponse;
 import com.chat_socket.dto.UpdateUserRequest;
 import com.chat_socket.dto.UserInfoDto;
-import com.chat_socket.dto.UserPair;
 import com.chat_socket.dto.UserProfileDto;
 import com.chat_socket.dto.UserSearchDto;
 import com.chat_socket.dto.UserSecurity;
@@ -31,6 +31,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,16 +41,19 @@ public class UserServiceImpl implements UserService {
     private final FriendRepository friendRepository;
     private final FriendRequestRepository friendRequestRepository;
     private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
 
     public UserServiceImpl(
             UserRepository userRepository,
             FriendRepository friendRepository,
             FriendRequestRepository friendRequestRepository,
-            UserMapper userMapper) {
+            UserMapper userMapper,
+            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.friendRepository = friendRepository;
         this.friendRequestRepository = friendRequestRepository;
         this.userMapper = userMapper;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -84,6 +88,23 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
+    public BaseResponse<Void> changePassword(ChangePasswordRequest request) {
+        UserSecurity currentUser = Security.getCurrentUser();
+        UserEntity user =
+                userRepository.findById(currentUser.id()).orElseThrow(() -> new NotFoundException("User not found"));
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getHashedPassword()))
+            throw new BadRequestException("Current password is incorrect.");
+        if (request.currentPassword().equals(request.newPassword()))
+            throw new BadRequestException("New password must differ from current password.");
+
+        user.setHashedPassword(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+        return new BaseResponse<>(null, null, HttpStatus.NO_CONTENT.value());
+    }
+
+    @Override
     public BaseResponse<UserInfoDto> getUserInfo(UUID userId) {
         UserSecurity currentUser = Security.getCurrentUser();
         UserEntity user = userRepository.findById(userId).orElseThrow(() -> new NotFoundException("User not found"));
@@ -91,7 +112,10 @@ public class UserServiceImpl implements UserService {
         FriendStatus status =
                 resolveFriendStatus(user, currentUser.id(), hasFriendship(currentUser.id(), userId), pendingRequest);
 
-        return new BaseResponse<>(userMapper.toUserInfoDto(user, status), "Success.", HttpStatus.OK.value());
+        return new BaseResponse<>(
+                userMapper.toUserInfoDto(user, status, pendingRequest == null ? null : pendingRequest.getId()),
+                "Success.",
+                HttpStatus.OK.value());
     }
 
     @Override
@@ -113,8 +137,8 @@ public class UserServiceImpl implements UserService {
         Map<UUID, FriendEntity> friendshipsByUserId =
                 friendRepository.findFriendshipsBetweenUserAndUsers(currentUser.id(), userIds).stream()
                         .collect(Collectors.toMap(
-                                friendship -> getFriendUser(friendship, currentUser.id())
-                                        .getId(),
+                                friendship ->
+                                        friendship.otherUser(currentUser.id()).getId(),
                                 Function.identity()));
         Map<UUID, FriendRequestEntity> pendingRequestsByUserId =
                 friendRequestRepository
@@ -138,9 +162,7 @@ public class UserServiceImpl implements UserService {
 
     private boolean hasFriendship(UUID currentUserId, UUID userId) {
         if (currentUserId.equals(userId)) return false;
-
-        UserPair pair = Normalize.normalizeUserPair(currentUserId, userId);
-        return friendRepository.existsByUserAIdAndUserBId(pair.userAId(), pair.userBId());
+        return friendRepository.existsFriendship(currentUserId, userId);
     }
 
     private FriendRequestEntity findPendingRequest(UUID currentUserId, UUID userId) {
@@ -151,10 +173,6 @@ public class UserServiceImpl implements UserService {
                 .stream()
                 .findFirst()
                 .orElse(null);
-    }
-
-    private UserEntity getFriendUser(FriendEntity friendship, UUID currentUserId) {
-        return friendship.getUserA().getId().equals(currentUserId) ? friendship.getUserB() : friendship.getUserA();
     }
 
     private FriendStatus resolveFriendStatus(

@@ -50,7 +50,13 @@ public class ConversationController {
         return ResponseEntity.status(body.status()).body(body);
     }
 
-    @PatchMapping("/{conversationId}/group")
+    @GetMapping("/{conversationId}")
+    public ResponseEntity<BaseResponse<ConversationDto>> getConversation(@PathVariable UUID conversationId) {
+        BaseResponse<ConversationDto> body = conversationService.getConversation(conversationId);
+        return ResponseEntity.status(body.status()).body(body);
+    }
+
+    @PatchMapping("/{conversationId}")
     @PreAuthorize("@groupPermission.canManageGroup(#conversationId)")
     public ResponseEntity<BaseResponse<ConversationDto>> updateGroup(
             @PathVariable UUID conversationId, @Valid @RequestBody UpdateGroupRequest request) {
@@ -71,7 +77,7 @@ public class ConversationController {
         return ResponseEntity.status(body.status()).body(body);
     }
 
-    @DeleteMapping("/{conversationId}/group")
+    @DeleteMapping("/{conversationId}")
     @PreAuthorize("@groupPermission.canManageGroup(#conversationId)")
     public ResponseEntity<BaseResponse<Void>> deleteGroup(@PathVariable UUID conversationId) {
         BaseResponse<Void> body = conversationService.deleteGroup(conversationId);

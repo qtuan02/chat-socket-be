@@ -4,12 +4,13 @@ public interface SocketChannel {
     String APP = "/app";
     String TOPIC = "/topic";
     String QUEUE = "/queue";
-
     String CONVERSATION = "/conversations";
     String MESSAGE = "/messages";
-    String SEEN = "/seen";
-
+    String TYPING = "/typing";
+    String ONLINE_USERS = "/online-users";
     String CONVERSATION_QUEUE = QUEUE + CONVERSATION;
     String MESSAGE_TOPIC = CONVERSATION + "/%s" + MESSAGE;
-    String CONVERSATION_SEEN_TOPIC = CONVERSATION + "/%s" + SEEN;
+    String TYPING_TOPIC = CONVERSATION + "/%s" + TYPING;
+    /** {@code @MessageMapping} pattern (relative to {@link #APP}). */
+    String TYPING_MAPPING = CONVERSATION + "/{conversationId}" + TYPING;
 }

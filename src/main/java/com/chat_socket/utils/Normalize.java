@@ -1,18 +1,9 @@
 package com.chat_socket.utils;
 
-import com.chat_socket.dto.UserPair;
 import java.text.Normalizer;
 import java.util.Locale;
-import java.util.UUID;
 
 public class Normalize {
-    public static UserPair normalizeUserPair(UUID firstUserId, UUID secondUserId) {
-        if (firstUserId.toString().compareTo(secondUserId.toString()) <= 0)
-            return new UserPair(firstUserId, secondUserId);
-
-        return new UserPair(secondUserId, firstUserId);
-    }
-
     public static String normalizeFullName(String firstName, String lastName) {
         String fullName = String.join(" ", valueOrBlank(firstName), valueOrBlank(lastName));
         return normalizeSearchText(fullName);

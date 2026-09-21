@@ -2,6 +2,7 @@ package com.chat_socket.service.impl;
 
 import com.chat_socket.ApplicationYaml;
 import com.chat_socket.service.JwtService;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import java.nio.charset.StandardCharsets;
@@ -10,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import java.util.HexFormat;
+import java.util.Optional;
 import java.util.UUID;
 import javax.crypto.SecretKey;
 import org.springframework.stereotype.Service;
@@ -45,14 +47,17 @@ public class JwtServiceImpl implements JwtService {
     }
 
     @Override
-    public UUID verifyAccessToken(String accessToken) {
-        String subject = Jwts.parser()
-                .verifyWith(accessTokenKey)
-                .build()
-                .parseSignedClaims(accessToken)
-                .getPayload()
-                .getSubject();
-
-        return UUID.fromString(subject);
+    public Optional<UUID> verifyAccessToken(String accessToken) {
+        try {
+            String subject = Jwts.parser()
+                    .verifyWith(accessTokenKey)
+                    .build()
+                    .parseSignedClaims(accessToken)
+                    .getPayload()
+                    .getSubject();
+            return Optional.of(UUID.fromString(subject));
+        } catch (JwtException | IllegalArgumentException exception) {
+            return Optional.empty();
+        }
     }
 }
